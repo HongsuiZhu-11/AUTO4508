@@ -1,0 +1,10 @@
+/home/team10/ws/AUTO4508/ariaNode/CMakeFiles/uninstall.dir
+/home/team10/ws/AUTO4508/ariaNode/CMakeFiles/ariaNode_uninstall.dir
+/home/team10/ws/AUTO4508/ariaNode/CMakeFiles/ariaNode.dir
+/home/team10/ws/AUTO4508/ariaNode/CMakeFiles/test.dir
+/home/team10/ws/AUTO4508/ariaNode/CMakeFiles/edit_cache.dir
+/home/team10/ws/AUTO4508/ariaNode/CMakeFiles/rebuild_cache.dir
+/home/team10/ws/AUTO4508/ariaNode/CMakeFiles/list_install_components.dir
+/home/team10/ws/AUTO4508/ariaNode/CMakeFiles/install.dir
+/home/team10/ws/AUTO4508/ariaNode/CMakeFiles/install/local.dir
+/home/team10/ws/AUTO4508/ariaNode/CMakeFiles/install/strip.dir
