@@ -1,0 +1,22 @@
+# 🎯 目标相关参数
+cone_height_m: 0.5             # 目标真实高度（米）
+
+# 📏 相机标定比例参数
+scale_k: 480.0                 # 标定比例系数：Z = k * H / h_px
+
+# 📷 摄像头输入配置
+image_topic: /usb_cam/image_raw
+ptz_port: /dev/ttyS1           # 控制 VC-C4 摄像头的串口
+
+# 🎯 目标颜色 HSV 范围
+hsv_lower: [10, 100, 100]      # 橙色 - HSV 下界
+hsv_upper: [25, 255, 255]      # 橙色 - HSV 上界
+
+# 🎯 中心对齐像素容差
+center_threshold_px: 20        # 若目标中心距图像中心小于该值，视为对齐
+
+# 🤖 机器人世界坐标（来自定位系统/TF）
+robot_pose:
+  x: 2.0
+  y: 3.5
+  theta_deg: 45.0              # 当前朝向角，单位：度

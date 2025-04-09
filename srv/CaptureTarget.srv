@@ -1,0 +1,9 @@
+# CaptureTarget.srv
+# 请求部分：为空，表示无需传入参数
+---
+
+# 响应部分：返回成功与否、图像路径和世界坐标
+bool success
+string image_path
+float64 world_x
+float64 world_y
