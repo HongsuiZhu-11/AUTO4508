@@ -16,6 +16,8 @@
 #include <geometry_msgs/msg/twist.hpp>
 
 # include "Aria/Aria.h"
+# include "drive.h"
+# include "joystick.h"
 
 //used with signal handler as signal handler function doesn't accept parameters
 bool stopRunning = false;
