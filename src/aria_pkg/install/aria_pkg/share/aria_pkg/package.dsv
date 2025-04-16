@@ -1,0 +1,5 @@
+source;share/aria_pkg/local_setup.bash
+source;share/aria_pkg/local_setup.dsv
+source;share/aria_pkg/local_setup.ps1
+source;share/aria_pkg/local_setup.sh
+source;share/aria_pkg/local_setup.zsh
