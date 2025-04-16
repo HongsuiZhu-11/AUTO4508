@@ -7,3 +7,4 @@ cmake CMakeList.txt
 make
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/team10/ws/AriaCoda/lib
 export PYTHONPATH=$PYTHONPATH:/home/team10/ws/AriaCoda/python
+#./gpsExample -robotPort /dev/ttyUSB0 -gpsPort /dev/ttyUSB0

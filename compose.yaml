@@ -3,7 +3,7 @@ services:
     image: first # These variables come from a .env file in the same directory
     container_name: first
     network_mode: host
-    devices: [ "/dev/input/js0:/dev/input/js0" , "/dev/ttyS0:/dev/ttyS0" ,"dev/ttyUSB0:/dev/ttyUSB0"]
+    devices: [ "/dev/input/js0:/dev/input/js0" , "/dev/ttyS0:/dev/ttyS0" ,"/dev/ttyS1:/dev/ttyS1", "dev/ttyUSB0:/dev/ttyUSB0"]
     # devices: [ "dev/ttyUSB0:/dev/ttyUSB0" ]
     # build:
     #   context: .
@@ -27,6 +27,9 @@ services:
     - type: bind
       source: /home/team10/ws
       target: /home/team10/ws
+    - type: bind
+      source: /home/team10/project
+      target: /home/team10/project
     command: ros2 run joy joy_node
     device_cgroup_rules: #alternative to devices
       - 'c 4:63 rmw'
