@@ -52,3 +52,22 @@ class PTZController:
 
     def close(self):
         self.ser.close()
+    
+    def get_pan_angle(self):
+        try:
+            self.send_command(b'\x81\x09\x06\x12\xFF')  # VISCA 查询命令
+            response = self.ser.read(9)  # 获取返回数据（9 字节）
+
+            if len(response) >= 9:
+                # 读取前四个字节（Pan 部分）
+                pan_raw = response[0:4]
+                pan_hex = ''.join([format(b, 'X') for b in pan_raw])
+                pan_value = int(pan_hex, 16)
+
+                # 将值映射为角度（-10000 ~ +10000 -> -170° ~ +170°）
+                # 依据具体设备手册而定，以下为假设范围映射
+                pan_angle = (pan_value - 0x8000) * (170.0 / 0x8000)
+                return pan_angle
+        except Exception as e:
+            print(f"[PTZ] 获取 pan 失败: {e}")
+        return 0.0
