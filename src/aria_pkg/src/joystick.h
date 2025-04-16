@@ -40,12 +40,16 @@ public:
         return connected_ ? myJoyHandler.getButton(button_num) : false;
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     }
 
     // Get all button states as bitmask
     unsigned int getButtons() {
         return connected_ ? myJoyHandler.getButton() : 0;
     }
+=======
+    } 
+>>>>>>> 85dbbc9 (joystick: fix get button to use correct function)
 =======
     } 
 >>>>>>> 85dbbc9 (joystick: fix get button to use correct function)
@@ -74,7 +78,11 @@ private:
     }
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> 85dbbc9 (joystick: fix get button to use correct function)
 =======
 };
 >>>>>>> 85dbbc9 (joystick: fix get button to use correct function)
