@@ -1,5 +1,4 @@
 from setuptools import find_packages, setup
-
 package_name = 'control_pkg'
 
 setup(
