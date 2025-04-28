@@ -1,0 +1,32 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from interfaces/msg/Gpsx.msg
+// generated code does not contain a copyright notice
+
+
+module interfaces {
+  module msg {
+    struct Gpsx {
+      double longitude;
+
+      double latitude;
+
+      double altitude;
+
+      float ground_speed;
+
+      uint8 satellites;
+
+      uint8 mode_indicator;
+
+      float separation;
+
+      float true_course;
+
+      float true_course_magnetic;
+
+      float dilution;
+
+      uint32 utc_time;
+    };
+  };
+};

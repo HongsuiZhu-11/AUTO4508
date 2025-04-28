@@ -25,12 +25,79 @@ services:
     #   source: /home/team10/Documents
     #   target: /home/team10/Documents
     - type: bind
-      source: /home/team10/ws
-      target: /home/team10/ws
-    - type: bind
-      source: /home/team10/project
-      target: /home/team10/project
+      source: /home/team10
+      target: /home/team10
     command: ros2 run joy joy_node
+    device_cgroup_rules: #alternative to devices
+      - 'c 4:63 rmw'
+      - 'c 188:0 rmw'
+      - 'c 189:0 rmw'
+      - 'c 13:* rmw'
+
+  joyTwist:
+    image: first # These variables come from a .env file in the same directory
+    container_name: joyTwist
+    network_mode: host
+    devices: [ "/dev/input/js0:/dev/input/js0" , "/dev/ttyS0:/dev/ttyS0" ,"/dev/ttyS1:/dev/ttyS1", "dev/ttyUSB0:/dev/ttyUSB0"]
+    # devices: [ "dev/ttyUSB0:/dev/ttyUSB0" ]
+    # build:
+    #   context: .
+    #   ssh: [ "default=$HOME/.ssh/id_rsa" ]
+    #   target: staging #pull from the current folder
+    tty: True
+    stdin_open: True
+    # command: ros2 launch master lowlevel.launch.py params_file:=/lowlevel_config
+    # configs:
+    # - lowlevel_config 
+    volumes:
+    # - type: bind
+    #   source: /dev/shm
+    #   target: /dev/shm
+    - type: bind
+      source: /dev
+      target: /dev
+    # - type: bind
+    #   source: /home/team10/Documents
+    #   target: /home/team10/Documents
+    - type: bind
+      source: /home/team10
+      target: /home/team10
+    command: ros2 launch teleop_twist_joy teleop-launch.py
+    device_cgroup_rules: #alternative to devices
+      - 'c 4:63 rmw'
+      - 'c 188:0 rmw'
+      - 'c 189:0 rmw'
+      - 'c 13:* rmw'
+
+  depthaiFilter:
+    image: first # These variables come from a .env file in the same directory
+    container_name: depthaiFilter
+    network_mode: host
+    devices: [ "/dev/input/js0:/dev/input/js0" , "/dev/ttyS0:/dev/ttyS0" ,"/dev/ttyS1:/dev/ttyS1", "dev/ttyUSB0:/dev/ttyUSB0"]
+    # devices: [ "dev/ttyUSB0:/dev/ttyUSB0" ]
+    # build:
+    #   context: .
+    #   ssh: [ "default=$HOME/.ssh/id_rsa" ]
+    #   target: staging #pull from the current folder
+    tty: True
+    stdin_open: True
+    # command: ros2 launch master lowlevel.launch.py params_file:=/lowlevel_config
+    # configs:
+    # - lowlevel_config 
+    volumes:
+    # - type: bind
+    #   source: /dev/shm
+    #   target: /dev/shm
+    - type: bind
+      source: /dev
+      target: /dev
+    # - type: bind
+    #   source: /home/team10/Documents
+    #   target: /home/team10/Documents
+    - type: bind
+      source: /home/team10
+      target: /home/team10
+    command: ros2 launch depthai_filters example_det2d_overla.launch.py
     device_cgroup_rules: #alternative to devices
       - 'c 4:63 rmw'
       - 'c 188:0 rmw'
