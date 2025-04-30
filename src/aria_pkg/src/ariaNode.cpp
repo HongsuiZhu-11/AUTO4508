@@ -15,9 +15,9 @@
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 
-# include "Aria/Aria.h"
-# include "drive.h"
-# include "joystick.h"
+#include "Aria/Aria.h"
+#include "drive.h"
+#include "joystick.h"
 
 //used with signal handler as signal handler function doesn't accept parameters
 bool stopRunning = false;
@@ -32,100 +32,120 @@ using namespace std::chrono_literals;
 */
 class ariaNode : public rclcpp::Node {
     public:
-        ariaNode(float* forwardSpeed, float* rotationSpeed) : Node("Aria_node") {
-            currentForwardSpeed = forwardSpeed;
-            currentRotationSpeed = rotationSpeed;
+	ariaNode(float *forwardSpeed, float *rotationSpeed)
+		: Node("Aria_node")
+	{
+		currentForwardSpeed = forwardSpeed;
+		currentRotationSpeed = rotationSpeed;
 
-            cmdVelSub = create_subscription<geometry_msgs::msg::Twist> (
-                "cmd_vel", 10, std::bind(&ariaNode::cmdVelCallback, this, std::placeholders::_1)
-            );    
-        }
+		cmdVelSub = create_subscription<geometry_msgs::msg::Twist>(
+			"cmd_vel", 10,
+			std::bind(&ariaNode::cmdVelCallback, this,
+				  std::placeholders::_1));
+	}
 
     private:
-        void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg) {
-            
-            double linearSpeed = msg->linear.x;
-            double angularSpeed = msg->angular.z;
+	void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
+	{
+		double linearSpeed = msg->linear.x;
+		double angularSpeed = msg->angular.z;
 
-            *currentForwardSpeed = linearSpeed;
-            *currentRotationSpeed = angularSpeed;
+		*currentForwardSpeed = linearSpeed;
+		*currentRotationSpeed = angularSpeed;
 
-            RCLCPP_DEBUG(this->get_logger(), "message received.");
+		RCLCPP_DEBUG(this->get_logger(), "message received.");
+	}
 
-        }
-
-        rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmdVelSub;
-        float* currentForwardSpeed;
-        float* currentRotationSpeed;
-    
+	rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmdVelSub;
+	float *currentForwardSpeed;
+	float *currentRotationSpeed;
 };
 
 // Deals with ctl+c handling to stop the motors correctly.
-void my_handler(int s){
-           printf("Caught signal %d\n",s);
-           stopRunning = true;
+void my_handler(int s)
+{
+	printf("Caught signal %d\n", s);
+	stopRunning = true;
 }
 
-int main(int argc, char** argv) {
-    rclcpp::init(argc, argv);
+int main(int argc, char **argv)
+{
+	rclcpp::init(argc, argv);
 
-    Aria::init();
-    ArArgumentParser parser(&argc, argv);
-    parser.loadDefaultArguments();
-    ArRobot* robot;
-    robot = new ArRobot();
+	Aria::init();
+	ArArgumentParser parser(&argc, argv);
+	parser.loadDefaultArguments();
+	ArRobot *robot;
+	robot = new ArRobot();
+	Drive drive(&robot);
+	Joystick joystick;
 
-    signal(SIGINT, my_handler);
-    
-    // RCLCPP_DEBUG(this->get_logger(),"Trying to connect to robot...");
-    ArRobotConnector robotConnector(&parser, robot);
-    if(!robotConnector.connectRobot()) {
-        ArLog::log(ArLog::Terse, "simpleConnect: Could not connect to the robot.");
-        if(parser.checkHelpAndWarnUnparsed()) {
-            Aria::logOptions();
-            Aria::exit(1);
-        }
-    }
+	signal(SIGINT, my_handler);
 
-    robot->setAbsoluteMaxTransVel(400);
+	// RCLCPP_DEBUG(this->get_logger(),"Trying to connect to robot...");
+	ArRobotConnector robotConnector(&parser, robot);
+	if (!robotConnector.connectRobot()) {
+		ArLog::log(ArLog::Terse,
+			   "simpleConnect: Could not connect to the robot.");
+		if (parser.checkHelpAndWarnUnparsed()) {
+			Aria::logOptions();
+			Aria::exit(1);
+		}
+	}
 
-    float forwardSpeed = 0.0;
-    float rotationSpeed = 0.0;
-    
-    
-    // RCLCPP_DEBUG(aNode->get_logger(),"Run Async");
-    robot->runAsync(true);
-    // RCLCPP_DEBUG(aNode->get_logger(),"Enable Motors");
-    robot->enableMotors();
+	//robot->setAbsoluteMaxTransVel(400);
 
-    auto aNode = std::make_shared<ariaNode>(&forwardSpeed, &rotationSpeed);
-    RCLCPP_DEBUG(aNode->get_logger(),"Before Spin!...");
+	//float forwardSpeed = 0.0;
+	//float rotationSpeed = 0.0;
 
-    /*
+	// RCLCPP_DEBUG(aNode->get_logger(),"Run Async");
+	robot->runAsync(true);
+	// RCLCPP_DEBUG(aNode->get_logger(),"Enable Motors");
+	robot->lock();
+	robot->enableMotors();
+	robot->unlock();
+
+	ArLog::log(ArLog::Normal,
+		   "Joystick driving started. Press Ctrl+C to exit.");
+
+	while (Aria::getRunning()) {
+		double x = 0.0, y = 0.0;
+		joystick.getAxes(x, y); // Get normalized joystick values
+
+		// Use Drive class to apply movement
+		drive.drive(y, x); // y controls linear, x controls angular
+
+		ArUtil::sleep(100);
+	}
+
+	/* auto aNode = std::make_shared<ariaNode>(&forwardSpeed, &rotationSpeed);
+	RCLCPP_DEBUG(aNode->get_logger(), "Before Spin!..."); */
+
+	/*
      *   Aria does not like to run in a ros node therefore we run a while loop
      *   that continuously spins the node to update velocities which are 
      *   then sent using the normal Aria commands.
     */
-    while (!stopRunning) {
-        rclcpp::spin_some(aNode);
-        // RCLCPP_DEBUG(aNode->get_logger(), "sending motor command.");
-            robot->lock();
-            robot->setVel(forwardSpeed * 500);
-            robot->setRotVel(rotationSpeed * 50);
-            robot->unlock();
-            // RCLCPP_DEBUG(aNode->get_logger(), "motor command sent.");
-            // RCLCPP_DEBUG(aNode->get_logger(), "forward speed is now %f.", forwardSpeed);
-            // RCLCPP_DEBUG(aNode->get_logger(), "rotational speed is now %f.", rotationSpeed);
-    }
-    RCLCPP_DEBUG(aNode->get_logger(), "After Spin");
+	/* while (!stopRunning) {
+		rclcpp::spin_some(aNode);
+		// RCLCPP_DEBUG(aNode->get_logger(), "sending motor command.");
+		robot->lock();
+		robot->setVel(forwardSpeed * 500);
+		robot->setRotVel(rotationSpeed * 50);
+		robot->unlock();
+		// RCLCPP_DEBUG(aNode->get_logger(), "motor command sent.");
+		// RCLCPP_DEBUG(aNode->get_logger(), "forward speed is now %f.", forwardSpeed);
+		// RCLCPP_DEBUG(aNode->get_logger(), "rotational speed is now %f.", rotationSpeed);
+	}
+	RCLCPP_DEBUG(aNode->get_logger(), "After Spin"); */
 
-    robot->disableMotors();
-    robot->stopRunning();
-    // wait for the thread to stop
-    robot->waitForRunExit();
+	robot->disableMotors();
+	robot->stopRunning();
+	// wait for the thread to stop
+	robot->waitForRunExit();
 
-    // exit
-    RCLCPP_DEBUG(aNode->get_logger(), "ending Aria node");
-    Aria::exit(0);
-    return 0;
+	// exit
+	RCLCPP_DEBUG(aNode->get_logger(), "ending Aria node");
+	Aria::exit(0);
+	return 0;
 }
