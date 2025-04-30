@@ -42,6 +42,7 @@ class ariaNode : public rclcpp::Node {
     private:
         void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg) {
             
+            
             double linearSpeed = msg->linear.x;
             double angularSpeed = msg->angular.z;
 
@@ -49,7 +50,6 @@ class ariaNode : public rclcpp::Node {
             *currentRotationSpeed = angularSpeed;
 
             RCLCPP_DEBUG(this->get_logger(), "message received.");
-
         }
 
         rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmdVelSub;
@@ -89,7 +89,6 @@ int main(int argc, char** argv) {
 
     float forwardSpeed = 0.0;
     float rotationSpeed = 0.0;
-    
     
     // RCLCPP_DEBUG(aNode->get_logger(),"Run Async");
     robot->runAsync(true);
