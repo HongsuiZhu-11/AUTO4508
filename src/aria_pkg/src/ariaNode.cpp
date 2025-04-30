@@ -16,7 +16,6 @@
 #include <geometry_msgs/msg/twist.hpp>
 
 #include "Aria/Aria.h"
-#include "drive.h"
 #include "joystick.h"
 
 //used with signal handler as signal handler function doesn't accept parameters
@@ -77,8 +76,6 @@ int main(int argc, char **argv)
 	parser.loadDefaultArguments();
 	ArRobot *robot;
 	robot = new ArRobot();
-	Drive drive(&robot);
-	Joystick joystick;
 
 	signal(SIGINT, my_handler);
 
@@ -92,6 +89,14 @@ int main(int argc, char **argv)
 			Aria::exit(1);
 		}
 	}
+
+    Joystick joystick;
+
+    if(!joystick.joy_connected()) {
+        printf("Joystick not connected\n");
+        Aria::exit(1);
+        return 1;
+    }
 
 	//robot->setAbsoluteMaxTransVel(400);
 
@@ -108,7 +113,10 @@ int main(int argc, char **argv)
 	ArLog::log(ArLog::Normal,
 		   "Joystick driving started. Press Ctrl+C to exit.");
 
-	while (Aria::getRunning()) {
+    robot.addAction(&joystick, 100);
+    robot.run(true);
+
+	/* while (Aria::getRunning()) {
 		double x = 0.0, y = 0.0;
 		joystick.getAxes(x, y); // Get normalized joystick values
 
@@ -116,7 +124,7 @@ int main(int argc, char **argv)
 		drive.drive(y, x); // y controls linear, x controls angular
 
 		ArUtil::sleep(100);
-	}
+	} */
 
 	/* auto aNode = std::make_shared<ariaNode>(&forwardSpeed, &rotationSpeed);
 	RCLCPP_DEBUG(aNode->get_logger(), "Before Spin!..."); */
@@ -139,11 +147,11 @@ int main(int argc, char **argv)
 	}
 	RCLCPP_DEBUG(aNode->get_logger(), "After Spin"); */
 
-	robot->disableMotors();
+	/* robot->disableMotors();
 	robot->stopRunning();
 	// wait for the thread to stop
 	robot->waitForRunExit();
-
+ */
 	// exit
 	RCLCPP_DEBUG(aNode->get_logger(), "ending Aria node");
 	Aria::exit(0);
