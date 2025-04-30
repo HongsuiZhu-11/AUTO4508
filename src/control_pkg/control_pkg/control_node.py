@@ -35,7 +35,7 @@ class ControlNode(Node):
         
         
         # Publisher
-        self.robot_pub = self.create_publisher(Twist, 'control_robot', 10)
+        self.robot_pub = self.create_publisher(Twist, 'cmd_vel_team10', 10)
         
         # Timer
         self.create_timer(100, self.timer_cb)
