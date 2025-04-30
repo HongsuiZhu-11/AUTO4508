@@ -1,0 +1,13 @@
+# CaptureTarget.srv
+# Request
+float64 robot_x
+float64 robot_y
+float64 robot_theta_deg
+---
+
+# Response
+bool success
+string cone_image_path
+float64 world_x
+float64 world_y
+project/BucketInfo[] buckets
