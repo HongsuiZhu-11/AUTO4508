@@ -15,36 +15,40 @@ def detect_colored_object(frame, hsv_lower, hsv_upper):
     return (None, None), mask
 
 
-def detect_colored_buckets(frame, color_ranges):
+
+def detect_colored_buckets(image, color_ranges):
     """
-    prams：
-        frame: current frame
-        color_ranges: dict，eg：
-            {
-              "red": [[0,100,100],[10,255,255]],
-              "blue": [[100,150,50],[130,255,255]],
-              "yellow": [[25,100,100],[35,255,255]]
-            }
-    return：
-        List[dict]，every elem contains：center, color, mask, contour
+    Detects colored buckets in an image using provided HSV color ranges.
+
+    Parameters:
+        image (np.ndarray): BGR input image
+        color_ranges (dict): Dict of {color_name: [lower_HSV, upper_HSV]} from YAML
+
+    Returns:
+        List[Dict]: Each with keys: "color", "center", "contour"
     """
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     results = []
+
     for color, (lower, upper) in color_ranges.items():
-        mask = cv2.inRange(hsv, np.array(lower), np.array(upper))
+        lower_np = np.array(lower, dtype=np.uint8)
+        upper_np = np.array(upper, dtype=np.uint8)
+
+        mask = cv2.inRange(hsv, lower_np, upper_np)
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        for cnt in contours:
-            area = cv2.contourArea(cnt)
-            if area < 500:
-                continue  # 过滤小目标
-            M = cv2.moments(cnt)
-            if M["m00"] > 0:
-                cx = int(M["m10"] / M["m00"])
-                cy = int(M["m01"] / M["m00"])
-                results.append({
-                    "center": (cx, cy),
-                    "color": color,
-                    "mask": mask,
-                    "contour": cnt
-                })
+
+        for contour in contours:
+            if cv2.contourArea(contour) < 200:  # filter small blobs
+                continue
+            M = cv2.moments(contour)
+            if M["m00"] == 0:
+                continue
+            cx = int(M["m10"] / M["m00"])
+            cy = int(M["m01"] / M["m00"])
+            results.append({
+                "color": color,
+                "center": (cx, cy),
+                "contour": contour
+            })
+
     return results

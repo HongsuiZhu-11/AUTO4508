@@ -6,12 +6,6 @@ depth_topic: /oak/stereo/depth
 hsv_lower: [10, 100, 100]
 hsv_upper: [25, 255, 255]
 
-# 🎯 桶颜色识别设置（可扩展多个颜色）
-bucket_heights:
-  red: 0.4
-  blue: 0.6
-  yellow: 0.45
-
 # 🎯 中心对准容差（像素偏移）
 center_threshold_px: 20
 
@@ -20,3 +14,8 @@ robot_pose:
   x: 0.0
   y: 0.0
   theta_deg: 0.0
+
+bucket_color_ranges:
+  red: [[0, 100, 100], [10, 255, 255]]
+  blue: [[100, 150, 0], [140, 255, 255]]
+  yellow: [[20, 100, 100], [35, 255, 255]]
