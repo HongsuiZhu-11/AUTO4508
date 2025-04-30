@@ -80,15 +80,24 @@ source devel/setup.bash
 
 ---
 
-## 🧭 Launch the Service
+## 🚀 Deployment & Launch
+
+### ✅ Step-by-step Deployment Guide
+
+1. Plug in the **OAK-D camera** via USB  
+2. Launch the camera using `depthai-ros`:
+
+```bash
+roslaunch depthai_ros_driver camera.launch
+```
+
+3. Launch the vision module node:
 
 ```bash
 roslaunch my_robot_vision align_capture_service.launch
 ```
 
----
-
-## 📡 Call the Service
+4. Call the capture service:
 
 ```bash
 rosservice call /capture_target "{robot_x: 2.0, robot_y: 3.5, robot_theta_deg: 45.0}"
@@ -123,10 +132,10 @@ depth_topic: /oak/stereo/depth
 hsv_lower: [10, 100, 100]
 hsv_upper: [25, 255, 255]
 
-bucket_heights:
-  red: 0.4
-  blue: 0.6
-  yellow: 0.45
+bucket_color_ranges:
+  red: [[0, 100, 100], [10, 255, 255]]
+  blue: [[100, 150, 0], [140, 255, 255]]
+  yellow: [[20, 100, 100], [35, 255, 255]]
 
 center_threshold_px: 20
 
