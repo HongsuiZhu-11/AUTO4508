@@ -17,6 +17,8 @@ def load_params():
     params["hsv_lower"] = rospy.get_param("~hsv_lower", [10, 100, 100])
     params["hsv_upper"] = rospy.get_param("~hsv_upper", [25, 255, 255])
     params["robot_pose"] = rospy.get_param("~robot_pose", {"x": 0.0, "y": 0.0, "theta_deg": 0.0})
+    params["bucket_color_ranges"] = rospy.get_param("~bucket_color_ranges", {})
+
     return params
 
 def run_capture(params):
@@ -55,7 +57,7 @@ def run_capture(params):
             cone_x_world, cone_y_world = transform_to_world(params["robot_pose"], x_rel, y_rel, 0.0)
 
             # Detect and process buckets
-            bucket_candidates = detect_colored_buckets(frame)
+            bucket_candidates = detect_colored_buckets(frame, params["bucket_color_ranges"])
             buckets = []
             for b in bucket_candidates:
                 bx, by = b["center"]
