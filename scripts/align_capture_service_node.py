@@ -16,7 +16,6 @@ def load_params():
     params["depth_topic"] = rospy.get_param("~depth_topic", "/oak/stereo/depth")
     params["hsv_lower"] = rospy.get_param("~hsv_lower", [10, 100, 100])
     params["hsv_upper"] = rospy.get_param("~hsv_upper", [25, 255, 255])
-    params["bucket_heights"] = rospy.get_param("~bucket_heights", {})
     params["robot_pose"] = rospy.get_param("~robot_pose", {"x": 0.0, "y": 0.0, "theta_deg": 0.0})
     return params
 
