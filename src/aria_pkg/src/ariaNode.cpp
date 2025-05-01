@@ -75,11 +75,11 @@ void log_data(GPS_DATA *data)
 int main(int argc, char **argv)
 {
 	Aria::init();
-	ArRobot *robot;
+	ArRobot robot;
 	ArArgumentParser parser(&argc, argv);
 	parser.loadDefaultArguments();
 
-	ArRobotConnector robot_connector(&parser, robot);
+	ArRobotConnector robot_connector(&parser, &robot);
 	if (!robot_connector.connectRobot()) {
 		ArLog::log(ArLog::Terse,
 			   "AriaNode: could not connect to the robot.");
@@ -95,23 +95,23 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	GPS_DATA *data;
+	GPS_DATA data;
     std::vector<GPS_DATA> waypoints = {
-        {1000.0, 0.0, 0.0, 200.0, 0.0, 0.0},    // Goal 1: (1m, 0m)
+        {1000.0, 500, 0.0, 200.0, 0.0, 0.0},    // Goal 1: (1m, 0m)
         {1000.0, 1000.0, 0.0, 200.0, 0.0, 0.0},   // Goal 2: (1m, 1m)
         {0.0, 1000.0, 0.0, 200.0, 0.0, 0.0},    // Goal 3: (0m, 1m)
         {0.0, 0.0, 0.0, 200.0, 0.0, 0.0}     // Goal 4: (0m, 0m)
     };
 
 	ArLog::log(ArLog::Terse, "AriaNode: connected:");
-	robot->runAsync(true);
+	robot.runAsync(true);
 
-	robot->lock();
-	robot->enableMotors();
-	robot->unlock();
+	robot.lock();
+	robot.enableMotors();
+	robot.unlock();
 
-	update_data(robot, data);
-	log_data(data);
+	update_data(&robot, &data);
+	log_data(&data);
 
 	double goal_tolerance = 50.0; // mm
     double rotation_tolerance = 5.0; // degrees
@@ -121,37 +121,36 @@ int main(int argc, char **argv)
     for (const auto &goal : waypoints) {
         ArLog::log(ArLog::Normal, "AriaNode: Moving to goal (%.2f, %.2f)", goal.x, goal.y);
         bool goal_reached = false;
-        while (rclcpp::ok() && !goal_reached) {
-            update_data(robot, data);
-            log_data(data);
+        while (!goal_reached) {
+            update_data(&robot, &data);
+            log_data(&data);
 
-            float distance_to_goal = cal_dist(data->x, data->y, goal.x, goal.y);
-            float angle_to_goal = cal_theta(data->x, data->y, goal.x, goal.y);
-            float angle_difference = ArMath::subAngle(angle_to_goal, data->th);
+            float distance_to_goal = cal_dist(data.x, data.y, goal.x, goal.y);
+            float angle_to_goal = cal_theta(data.x, data.y, goal.x, goal.y);
+            float angle_difference = ArMath::subAngle(angle_to_goal, data.th);
 
             if (std::abs(angle_difference) > rotation_tolerance) {
                 float rotation_vel = approach_rotation_speed * (angle_difference > 0 ? 1.0 : -1.0);
-                drive(robot, 0.0, rotation_vel);
+                drive(&robot, 0.0, rotation_vel);
+		ArLog::log(ArLog::Normal, "Rot:%.2f\n", rotation_vel);
             } else if (distance_to_goal > goal_tolerance) {
-                drive(robot, approach_speed, 0.0);
+                drive(&robot, approach_speed, 0.0);
             } else {
                 ArLog::log(ArLog::Normal, "AriaNode: Goal (%.2f, %.2f) reached.", goal.x, goal.y);
-                drive(robot, 0.0, 0.0);
+                drive(&robot, 0.0, 0.0);
                 goal_reached = true;
                 ArUtil::sleep(2000);
             }
             ArUtil::sleep(100);
-        }
-        if (!rclcpp::ok()) {
-            break;
+	   ArLog::log(ArLog::Normal, "X:%0.2f, Y:%0.2f", data.x, data.y);
         }
     }
 
 	ArLog::log(ArLog::Normal,
 		   "AriaNode: Ending robot thread...");
-	robot->stopRunning();
+	robot.stopRunning();
 
-	robot->waitForRunExit();
+	robot.waitForRunExit();
 
 	ArLog::log(ArLog::Normal, "AriaNode: Exiting.");
 	Aria::exit(0);
