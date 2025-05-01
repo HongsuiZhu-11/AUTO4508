@@ -42,7 +42,7 @@ float cal_theta(float x, float y, float goal_x, float goal_y)
 	return atan2(dy, dx) * 180 / M_PI;
 }
 
-void drive(ArRobot robot, float vel, float rot)
+void drive(ArRobot *robot, float vel, float rot)
 {
 	robot.lock();
 	robot.setVel(vel);
@@ -51,7 +51,7 @@ void drive(ArRobot robot, float vel, float rot)
 	ArUtil::sleep(500);
 }
 
-void update_data(ArRobot robot, GPS_DATA *data)
+void update_data(ArRobot *robot, GPS_DATA *data)
 {
 	robot.lock();
 	data->x = robot.getX();
@@ -75,11 +75,11 @@ void log_data(GPS_DATA *data)
 int main(int argc, char **argv)
 {
 	Aria::init();
-	ArRobot robot;
+	ArRobot *robot;
 	ArArgumentParser parser(&argc, argv);
 	parser.loadDefaultArguments();
 
-	ArRobotConnector robot_connector(&parser, &robot);
+	ArRobotConnector robot_connector(&parser, robot);
 	if (!robot_connector.connectRobot()) {
 		ArLog::log(ArLog::Terse,
 			   "AriaNode: could not connect to the robot.");
