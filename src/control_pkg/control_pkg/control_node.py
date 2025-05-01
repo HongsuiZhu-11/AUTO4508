@@ -3,7 +3,8 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String, Float32
 from gps_msgs.msg import GPSFix
-from interfaces.msg import Gpsx
+#from interfaces.msg import Gpsx
+from gpsx.msg import Gpsx
 from sensor_msgs.msg import Joy
 from geometry_msgs.msg import Twist
 
