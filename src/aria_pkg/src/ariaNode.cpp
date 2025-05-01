@@ -44,23 +44,23 @@ float cal_theta(float x, float y, float goal_x, float goal_y)
 
 void drive(ArRobot *robot, float vel, float rot)
 {
-	robot.lock();
-	robot.setVel(vel);
-	robot.setRotVel(rot);
-	robot.unlock();
+	robot->lock();
+	robot->setVel(vel);
+	robot->setRotVel(rot);
+	robot->unlock();
 	ArUtil::sleep(500);
 }
 
 void update_data(ArRobot *robot, GPS_DATA *data)
 {
-	robot.lock();
-	data->x = robot.getX();
-	data->y = robot.getY();
-	data->th = robot.getTh();
-	data->vel = robot.getVel();
-	data->rot_vel = robot.getRotVel();
-	data->battery = robot.getBatteryVoltage();
-	robot.unlock();
+	robot->lock();
+	data->x = robot->getX();
+	data->y = robot->getY();
+	data->th = robot->getTh();
+	data->vel = robot->getVel();
+	data->rot_vel = robot->getRotVel();
+	data->battery = robot->getBatteryVoltage();
+	robot->unlock();
 }
 
 void log_data(GPS_DATA *data)
@@ -104,11 +104,11 @@ int main(int argc, char **argv)
     };
 
 	ArLog::log(ArLog::Terse, "AriaNode: connected:");
-	robot.runAsync(true);
+	robot->runAsync(true);
 
-	robot.lock();
-	robot.enableMotors();
-	robot.unlock();
+	robot->lock();
+	robot->enableMotors();
+	robot->unlock();
 
 	update_data(robot, data);
 	log_data(data);
@@ -149,9 +149,9 @@ int main(int argc, char **argv)
 
 	ArLog::log(ArLog::Normal,
 		   "AriaNode: Ending robot thread...");
-	robot.stopRunning();
+	robot->stopRunning();
 
-	robot.waitForRunExit();
+	robot->waitForRunExit();
 
 	ArLog::log(ArLog::Normal, "AriaNode: Exiting.");
 	Aria::exit(0);
