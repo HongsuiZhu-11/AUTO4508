@@ -30,7 +30,7 @@ class ControlNode(Node):
         super().__init__("Control_Node")
         
         # Subscribers 
-        self.create_subscription(GPSFix, "gpsx", self.gps_callback, 10)
+        self.create_subscription(Gpsx, "gpsx", self.gps_callback, 10)
         self.create_subscription(Joy, "joy", self.joy_cb, 10)
         self.create_subscription(Twist, "cmd_vel", self.twist_cb, 10)
         
@@ -63,18 +63,24 @@ class ControlNode(Node):
         
     
     def joy_cb(self, msg):
-        print(msg)
+        #print(msg)
         if (msg.buttons[1]): # B Circle
+            print('Button 1')
             self.drive_mode = DRIVE_MODE.MANUAL
         elif (msg.buttons[2]): # X Square
+            print('Button 2')
             self.drive_mode = DRIVE_MODE.AUTO
+        elif (msg.buttons[3]):
+            print('Button 3')
+        elif (msg.button[4]):
+            print('Button 4')
             
-        if (msg.axis[5] < 0):
+        if (msg.axes[5] < 0):
             self.trigger = True
         else:
             self.trigger = False
             control_msg = self.convert_msg(0.0, 0.0)
-            self.robot_pub(control_msg)
+            self.robot_pub.publish(control_msg)
             
     def twist_cb(self, msg):
         if (self.drive_mode == DRIVE_MODE.MANUAL):

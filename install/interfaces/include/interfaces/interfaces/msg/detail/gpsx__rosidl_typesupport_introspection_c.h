@@ -1,0 +1,1 @@
+/home/team10/project/AUTO4508/build/interfaces/rosidl_typesupport_introspection_c/interfaces/msg/detail/gpsx__rosidl_typesupport_introspection_c.h

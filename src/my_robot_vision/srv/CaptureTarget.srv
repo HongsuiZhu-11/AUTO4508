@@ -10,4 +10,4 @@ bool success
 string cone_image_path
 float64 world_x
 float64 world_y
-project/BucketInfo[] buckets
+my_robot_vision/msg/BucketInfo[] buckets
