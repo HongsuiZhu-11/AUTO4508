@@ -26,6 +26,16 @@ typedef struct {
 	float battery;
 } GPS_DATA;
 
+typedef struct {
+	double latitude;
+	double longitude;
+	double altitude;
+	double dilution;
+	double separation;
+	int fix;
+	int statellites;
+} GPS_MSG;
+
 float cal_dist(float x, float y, float x2, float y2)
 {
 	float dx = x2 - x;
@@ -70,6 +80,10 @@ void log_data(GPS_DATA *data)
 		"AriaNode: Pose=(%.2f,%.2f,%.2f), Trans. Vel=%.2f, Rot. Vel=%.2f, Battery=%.2fV",
 		data->x, data->y, data->th, data->vel, data->rot_vel,
 		data->battery);
+}
+
+void gps_sub_cb(const gpsx::msg::Gpsx msg) {
+	
 }
 
 int main(int argc, char **argv)

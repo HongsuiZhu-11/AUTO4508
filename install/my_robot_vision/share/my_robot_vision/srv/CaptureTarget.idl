@@ -1,0 +1,28 @@
+// generated from rosidl_adapter/resource/srv.idl.em
+// with input from my_robot_vision/srv/CaptureTarget.srv
+// generated code does not contain a copyright notice
+
+#include "my_robot_vision/msg/BucketInfo.idl"
+
+module my_robot_vision {
+  module srv {
+    struct CaptureTarget_Request {
+      double robot_x;
+
+      double robot_y;
+
+      double robot_theta_deg;
+    };
+    struct CaptureTarget_Response {
+      boolean success;
+
+      string cone_image_path;
+
+      double world_x;
+
+      double world_y;
+
+      sequence<my_robot_vision::msg::BucketInfo> buckets;
+    };
+  };
+};
