@@ -6,29 +6,28 @@ from detector import detect_colored_object, detect_colored_buckets
 from coordinate_utils import transform_to_world
 from my_robot_vision.srv import CaptureTarget, CaptureTargetResponse
 from my_robot_vision.msg import BucketInfo
-from utils.image_utils import crop_and_save_object
+from utils.image_utils import save_full_frame_with_label
 
 def load_params():
     params = {}
     params["center_threshold_px"] = rospy.get_param("~center_threshold_px", 20)
-    params["hsv_lower"] = rospy.get_param("~hsv_lower", [10, 100, 100])
+    params["hsv_lower"] = rospy.get_param("~hsv_lower", [10, 100, 100])  # cone (orange)
     params["hsv_upper"] = rospy.get_param("~hsv_upper", [25, 255, 255])
     params["robot_pose"] = rospy.get_param("~robot_pose", {"x": 0.0, "y": 0.0, "theta_deg": 0.0})
-    params["bucket_color_ranges"] = rospy.get_param("~bucket_color_ranges", {})
+    params["bucket_color_ranges"] = rospy.get_param("~bucket_color_ranges", {})  # YAML bucket color HSVs
     return params
 
 def run_capture(params):
     camera = OakCameraCapture()
     camera.start()
 
-    rospy.loginfo("[AlignCapture] OAK-D camera started, capturing...")
+    rospy.loginfo("[AlignCapture] OAK-D camera started, waiting for target...")
     rate = rospy.Rate(5)
     timeout = rospy.Time.now() + rospy.Duration(15)
 
     while not rospy.is_shutdown():
         if rospy.Time.now() > timeout:
-            rospy.logwarn("[AlignCapture] Timeout: target not aligned in time.")
-            return False, "", 0.0, 0.0, []
+            return False, "timeout", 0.0, 0.0, []
 
         frame = camera.get_current_frame()
         depth = camera.get_current_depth()
@@ -36,47 +35,51 @@ def run_capture(params):
             rate.sleep()
             continue
 
-        (tx, ty), mask = detect_colored_object(frame, params["hsv_lower"], params["hsv_upper"])
-        if tx is None:
+        cx, cy = frame.shape[1] // 2, frame.shape[0] // 2
+        cone_center, cone_mask = detect_colored_object(frame, params["hsv_lower"], params["hsv_upper"])
+        bucket_candidates = detect_colored_buckets(frame, params["bucket_color_ranges"])
+
+        found_cone = cone_center is not None
+        found_bucket = len(bucket_candidates) > 0
+
+        if not found_cone and not found_bucket:
             rate.sleep()
             continue
 
-        # 计算图像中心
-        cx, cy = frame.shape[1] // 2, frame.shape[0] // 2
-        dx, dy = tx - cx, ty - cy
+        rospy.loginfo("[AlignCapture] Target detected. Capturing image...")
+        frame_saved, path = camera.capture_and_save()
 
-        # ✅ 图像居中对齐判定（不控制相机旋转）
-        if abs(dx) < params["center_threshold_px"] and abs(dy) < params["center_threshold_px"]:
-            rospy.loginfo("[AlignCapture] Target centered. Capturing image...")
-            frame_saved, path = camera.capture_and_save()
+        x_world = y_world = 0.0
+        buckets = []
 
-            # 获取锥的深度值并计算世界坐标
+        # Cone world coordinate
+        if found_cone:
+            tx, ty = cone_center
             cone_depth = depth[ty, tx] / 1000.0
             x_rel, y_rel = 0.0, cone_depth
-            cone_x_world, cone_y_world = transform_to_world(params["robot_pose"], x_rel, y_rel, 0.0)
+            x_world, y_world = transform_to_world(params["robot_pose"], x_rel, y_rel, 0.0)
 
-            # 检测并处理桶对象
-            bucket_candidates = detect_colored_buckets(frame, params["bucket_color_ranges"])
-            buckets = []
-            for b in bucket_candidates:
-                bx, by = b["center"]
-                bucket_depth = depth[by, bx] / 1000.0
-                if bucket_depth <= 0.1:
-                    continue
-                bx_rel, by_rel = 0.0, bucket_depth
-                bucket_x_world, bucket_y_world = transform_to_world(params["robot_pose"], bx_rel, by_rel, 0.0)
-                distance = ((bucket_x_world - cone_x_world) ** 2 + (bucket_y_world - cone_y_world) ** 2) ** 0.5
-                image_path = crop_and_save_object(frame, b["contour"], b["color"])
-                info = BucketInfo(
-                    color=b["color"],
-                    image_path=image_path,
-                    distance_to_cone=distance,
-                    x=bucket_x_world,
-                    y=bucket_y_world
-                )
-                buckets.append(info)
+        # Bucket detection & distance
+        for b in bucket_candidates:
+            bx, by = b["center"]
+            bucket_depth = depth[by, bx] / 1000.0
+            if bucket_depth <= 0.1:
+                continue
+            bx_rel, by_rel = 0.0, bucket_depth
+            bx_world, by_world = transform_to_world(params["robot_pose"], bx_rel, by_rel, 0.0)
 
-            return True, path, cone_x_world, cone_y_world, buckets
+            distance = ((bx_world - x_world) ** 2 + (by_world - y_world) ** 2) ** 0.5 if found_cone else 0.0
+            image_path = save_full_frame_with_label(frame, b["contour"], b["color"])
+
+            buckets.append(BucketInfo(
+                color=b["color"],
+                image_path=image_path,
+                distance_to_cone=distance,
+                x=bx_world,
+                y=by_world
+            ))
+
+        return True, path, x_world, y_world, buckets
 
         rate.sleep()
 
@@ -89,5 +92,6 @@ def handle_capture_target(req):
 if __name__ == "__main__":
     rospy.init_node("align_capture_service_node")
     service = rospy.Service("/capture_target", CaptureTarget, handle_capture_target)
-    rospy.loginfo("[AlignCaptureService] Ready to capture target using image-based alignment.")
+    rospy.loginfo("[AlignCaptureService] Ready to capture target using OAK-D and return coordinates.")
     rospy.spin()
+

@@ -1,5 +1,5 @@
 string color
+float64 distance_m
+float64 world_x
+float64 world_y
 string image_path
-float64 distance_to_cone
-float64 x
-float64 y
