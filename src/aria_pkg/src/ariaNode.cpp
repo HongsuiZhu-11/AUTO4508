@@ -1,172 +1,177 @@
-/*
-*   A basic node for ros2 that runs with ariaCoda
-*   To run use 'ros2 run ariaNode ariaNode -rp /dev/ttyUSB0'
-*
-*   Author: Kieran Quirke-Brown
-*   Date: 12/01/2024
-*/
-
-#include <chrono>
-#include <functional>
-#include <memory>
-#include <string>
+#include "ariaNode.hpp"
 #include <signal.h>
 
-#include <rclcpp/rclcpp.hpp>
-#include <geometry_msgs/msg/twist.hpp>
-
-#include "Aria/Aria.h"
-
-typedef struct {
-	float x;
-	float y;
-	float th;
-	float vel;
-	float rot_vel;
-	float battery;
-} GPS_DATA;
-
-typedef struct {
-	double latitude;
-	double longitude;
-	double altitude;
-	double dilution;
-	double separation;
-	int fix;
-	int statellites;
-} GPS_MSG;
-
-float cal_dist(float x, float y, float x2, float y2)
+static bool g_stop = false;
+void signalHandler(int)
 {
-	float dx = x2 - x;
-	float dy = y2 - y;
-
-	return std::sqrt(dx * dx + dy * dy);
+	g_stop = true;
 }
 
-float cal_theta(float x, float y, float goal_x, float goal_y)
+AriaNode::AriaNode(int &argc, char **argv)
+	: Node("aria_node")
+	, robot_()
+	, stop_requested_(false)
 {
-	float dx = goal_x - x;
-	float dy = goal_y - y;
+	Aria::init();
+	ArArgumentParser parser(&argc, argv);
+	parser.loadDefaultArguments();
+	ArRobotConnector connector(&parser, &robot_);
+	if (!connector.connectRobot()) {
+		RCLCPP_FATAL(get_logger(), "Could not connect to Aria robot");
+		rclcpp::shutdown();
+		return;
+	}
+	robot_.runAsync(true);
+	robot_.lock();
+	robot_.enableMotors();
+	robot_.unlock();
 
-	return atan2(dy, dx) * 180 / M_PI;
+	gps_sub_ = create_subscription<sensor_msgs::msg::NavSatFix>(
+		"/fix", 10,
+		std::bind(&AriaNode::onGPS, this, std::placeholders::_1));
+
+	waypoints_ = { { 1000, 500, 0, 200, 0, 0 },
+		       { 1000, 1000, 0, 200, 0, 0 },
+		       { 0, 1000, 0, 200, 0, 0 },
+		       { 0, 0, 0, 200, 0, 0 } };
+
+	signal(SIGINT, signalHandler);
 }
 
-void drive(ArRobot *robot, float vel, float rot)
+AriaNode::~AriaNode()
 {
-	robot->lock();
-	robot->setVel(vel);
-	robot->setRotVel(rot);
-	robot->unlock();
+	robot_.disableMotors();
+	robot_.stopRunning();
+	robot_.waitForRunExit();
+	Aria::exit(0);
+}
+
+void AriaNode::onGPS(const sensor_msgs::msg::NavSatFix::SharedPtr msg)
+{
+	RCLCPP_INFO(get_logger(), "GPS: lat=%.6f lon=%.6f alt=%.2f",
+		    msg->latitude, msg->longitude, msg->altitude);
+}
+
+void AriaNode::updateData()
+{
+	robot_.lock();
+	data_.x = robot_.getX();
+	data_.y = robot_.getY();
+	data_.th = robot_.getTh();
+	data_.vel = robot_.getVel();
+	data_.rot_vel = robot_.getRotVel();
+	data_.battery = robot_.getBatteryVoltage();
+	robot_.unlock();
+}
+
+void AriaNode::logData()
+{
+	RCLCPP_INFO(get_logger(),
+		    "Pose=(%.2f,%.2f,%.2f) Vel=%.2f Rot=%.2f Batt=%.2fV",
+		    data_.x, data_.y, data_.th, data_.vel, data_.rot_vel,
+		    data_.battery);
+}
+
+void AriaNode::driveStraight(double vel)
+{
+	robot_.lock();
+	robot_.setVel(vel);
+	robot_.setRotVel(0);
+	robot_.unlock();
 	ArUtil::sleep(500);
 }
 
-void update_data(ArRobot *robot, GPS_DATA *data)
+void AriaNode::driveTurn(double rot_vel)
 {
-	robot->lock();
-	data->x = robot->getX();
-	data->y = robot->getY();
-	data->th = robot->getTh();
-	data->vel = robot->getVel();
-	data->rot_vel = robot->getRotVel();
-	data->battery = robot->getBatteryVoltage();
-	robot->unlock();
+	robot_.lock();
+	robot_.setVel(0);
+	robot_.setRotVel(rot_vel);
+	robot_.unlock();
+	ArUtil::sleep(500);
 }
 
-void log_data(GPS_DATA *data)
+double AriaNode::calDist(double x, double y, double x2, double y2)
 {
-	ArLog::log(
-		ArLog::Normal,
-		"AriaNode: Pose=(%.2f,%.2f,%.2f), Trans. Vel=%.2f, Rot. Vel=%.2f, Battery=%.2fV",
-		data->x, data->y, data->th, data->vel, data->rot_vel,
-		data->battery);
+	double dx = x2 - x, dy = y2 - y;
+	return std::hypot(dx, dy);
 }
 
-void gps_sub_cb(const gpsx::msg::Gpsx msg) {
-	
+double AriaNode::calTheta(double x, double y, double goal_x, double goal_y)
+{
+	double dx = goal_x - x, dy = goal_y - y;
+	return std::atan2(dy, dx) * 180.0 / M_PI;
+}
+
+void AriaNode::turnToAngle(double target_heading, double tol_deg)
+{
+	rclcpp::Rate rate(10);
+
+	while (rclcpp::ok()) {
+		double current = robot_.getTh();
+
+		double error = ArMath::subAngle(target_heading, current);
+
+		if (std::fabs(error) <= tol_deg) {
+			robot_.lock();
+			robot_.setRotVel(0);
+			robot_.unlock();
+			break;
+		}
+
+		double vel = turn_kp_ * error; // deg/s
+		vel = std::max(-max_turn_vel_, std::min(max_turn_vel_, vel));
+
+		robot_.lock();
+		robot_.setVel(0);
+		robot_.setRotVel(vel);
+		robot_.unlock();
+
+		rate.sleep();
+	}
+}
+
+void AriaNode::run()
+{
+	const double goal_tol = 50.0; // mm
+	const double rot_tol = 5.0; // degrees
+
+	for (auto &wp : waypoints_) {
+		RCLCPP_INFO(get_logger(), "Moving to (%.2f,%.2f)", wp.x, wp.y);
+		bool reached = false;
+		while (!reached && !g_stop) {
+			updateData();
+			logData();
+
+			double dist = calDist(data_.x, data_.y, wp.x, wp.y);
+			double heading = calTheta(data_.x, data_.y, wp.x, wp.y);
+			double diff = ArMath::subAngle(heading, data_.th);
+
+			if (std::fabs(diff) > rot_tol) {
+				double rv =
+					wp.rot_vel * (diff > 0 ? 1.0 : -1.0);
+				driveTurn(rv);
+			} else if (dist > goal_tol) {
+				driveStraight(wp.vel);
+			} else {
+				RCLCPP_INFO(get_logger(), "Reached (%.2f,%.2f)",
+					    wp.x, wp.y);
+				driveStraight(0);
+				reached = true;
+				ArUtil::sleep(2000);
+			}
+		}
+		if (g_stop)
+			break;
+	}
+
+	RCLCPP_INFO(get_logger(), "Shutting down.");
 }
 
 int main(int argc, char **argv)
 {
-	Aria::init();
-	ArRobot robot;
-	ArArgumentParser parser(&argc, argv);
-	parser.loadDefaultArguments();
-
-	ArRobotConnector robot_connector(&parser, &robot);
-	if (!robot_connector.connectRobot()) {
-		ArLog::log(ArLog::Terse,
-			   "AriaNode: could not connect to the robot.");
-		if (parser.checkHelpAndWarnUnparsed()) {
-			Aria::logOptions();
-			Aria::exit(1);
-			return 1;
-		}
-	}
-	if (!Aria::parseArgs()) {
-		Aria::logOptions();
-		Aria::exit(1);
-		return 1;
-	}
-
-	GPS_DATA data;
-    std::vector<GPS_DATA> waypoints = {
-        {1000.0, 500, 0.0, 200.0, 0.0, 0.0},    // Goal 1: (1m, 0m)
-        {1000.0, 1000.0, 0.0, 200.0, 0.0, 0.0},   // Goal 2: (1m, 1m)
-        {0.0, 1000.0, 0.0, 200.0, 0.0, 0.0},    // Goal 3: (0m, 1m)
-        {0.0, 0.0, 0.0, 200.0, 0.0, 0.0}     // Goal 4: (0m, 0m)
-    };
-
-	ArLog::log(ArLog::Terse, "AriaNode: connected:");
-	robot.runAsync(true);
-
-	robot.lock();
-	robot.enableMotors();
-	robot.unlock();
-
-	update_data(&robot, &data);
-	log_data(&data);
-
-	double goal_tolerance = 50.0; // mm
-    double rotation_tolerance = 5.0; // degrees
-    double approach_speed = 150.0;
-    double approach_rotation_speed = 30.0;
-
-    for (const auto &goal : waypoints) {
-        ArLog::log(ArLog::Normal, "AriaNode: Moving to goal (%.2f, %.2f)", goal.x, goal.y);
-        bool goal_reached = false;
-        while (!goal_reached) {
-            update_data(&robot, &data);
-            log_data(&data);
-
-            float distance_to_goal = cal_dist(data.x, data.y, goal.x, goal.y);
-            float angle_to_goal = cal_theta(data.x, data.y, goal.x, goal.y);
-            float angle_difference = ArMath::subAngle(angle_to_goal, data.th);
-
-            if (std::abs(angle_difference) > rotation_tolerance) {
-                float rotation_vel = approach_rotation_speed * (angle_difference > 0 ? 1.0 : -1.0);
-                drive(&robot, 0.0, rotation_vel);
-		ArLog::log(ArLog::Normal, "Rot:%.2f\n", rotation_vel);
-            } else if (distance_to_goal > goal_tolerance) {
-                drive(&robot, approach_speed, 0.0);
-            } else {
-                ArLog::log(ArLog::Normal, "AriaNode: Goal (%.2f, %.2f) reached.", goal.x, goal.y);
-                drive(&robot, 0.0, 0.0);
-                goal_reached = true;
-                ArUtil::sleep(2000);
-            }
-            ArUtil::sleep(100);
-	   ArLog::log(ArLog::Normal, "X:%0.2f, Y:%0.2f", data.x, data.y);
-        }
-    }
-
-	ArLog::log(ArLog::Normal,
-		   "AriaNode: Ending robot thread...");
-	robot.stopRunning();
-
-	robot.waitForRunExit();
-
-	ArLog::log(ArLog::Normal, "AriaNode: Exiting.");
-	Aria::exit(0);
+	rclcpp::init(argc, argv);
+	auto node = std::make_shared<AriaNode>(argc, argv);
+	node->run();
+	rclcpp::shutdown();
 	return 0;
 }

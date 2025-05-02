@@ -8,7 +8,8 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(rclcpp_components REQUIRED)
 
 include_directories(include)
 
@@ -26,8 +27,9 @@ endif()
 
 add_executable(ariaNode src/ariaNode.cpp)
 ament_target_dependencies(ariaNode
-"geometry_msgs"
 "rclcpp"
+"sensor_msgs"
+"rclcpp_components"
 )
 
 target_link_libraries(
