@@ -118,10 +118,17 @@ class ControlNode(Node):
             self.angle = angle
             self.lat = cur_lat
             self.long = cur_long
-            if abs(target_angle - self.angle) < ANGLE_MARGIN:
+            
+            rot = int(target_angle - self.angle)
+            if (rot > 180):
+                rot = rot - 360
+            elif (rot < -180):
+                rot = rot + 360
+                    
+            if abs(rot) < ANGLE_MARGIN:
                 return
             # Turning
-            self.turn_robot(target_angle)
+            self.turn_robot(rot)
             return
         
         # 250mm/s 
