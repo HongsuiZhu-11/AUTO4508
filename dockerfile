@@ -4,5 +4,5 @@ RUN apt update && apt upgrade -y && apt install ros-jazzy-joy
 
 RUN apt upgrade -y && apt install ros-jazzy-depthai-ros -y
 
-RUN apt install python3-pip && pip3 install opencv_python
+#RUN apt install python3-pip && pip3 install opencv_python
 

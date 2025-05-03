@@ -35,7 +35,7 @@ class ariaNode : public rclcpp::Node {
             currentRotationSpeed = rotationSpeed;
 
             cmdVelSub = create_subscription<geometry_msgs::msg::Twist> (
-                "cmd_vel", 10, std::bind(&ariaNode::cmdVelCallback, this, std::placeholders::_1)
+                "cmd_vel_team10", 10, std::bind(&ariaNode::cmdVelCallback, this, std::placeholders::_1)
             );    
         }
 
@@ -50,6 +50,7 @@ class ariaNode : public rclcpp::Node {
             *currentRotationSpeed = angularSpeed;
 
             RCLCPP_DEBUG(this->get_logger(), "message received.");
+            printf("message received.%lf, %lf\n", linearSpeed, angularSpeed);
         }
 
         rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmdVelSub;

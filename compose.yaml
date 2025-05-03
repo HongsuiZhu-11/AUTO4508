@@ -29,45 +29,8 @@ services:
     - type: bind
       source: /home/team10
       target: /home/team10
-    command: ros2 run joy joy_node 
-
-    device_cgroup_rules: #alternative to devices
-      - 'c 4:63 rmw'
-      - 'c 188:0 rmw'
-      - 'c 189:0 rmw'
-      - 'c 13:* rmw'
-  joyTwist:
-    image: first  #first # These variables come from a .env file in the same directory
-    container_name: joyTwist
-    network_mode: host
-    #depends_on: [aria_drive]
-    privileged: true
-    devices: [  "/dev/ttyS0:/dev/ttyS0" ,"/dev/ttyUSB0:/dev/ttyUSB0", "/dev/input/js0:/dev/input/js0"]
-    # devices: [ "dev/ttyUSB0:/dev/ttyUSB0" ]
-    # build:
-    #   context: .
-    #   ssh: [ "default=$HOME/.ssh/id_rsa" ]
-    #   target: staging #pull from the current folder
-    tty: true
-    stdin_open: true
-    # command: ros2 launch master lowlevel.launch.py params_file:=/lowlevel_config
-    # configs:
-    # - lowlevel_config 
-    volumes:
-    # - type: bind
-    #   source: /dev/shm
-    #   target: /dev/shm
-    - type: bind
-      source: /dev
-      target: /dev
-    # - type: bind
-    #   source: /home/team10/Documents
-    #   target: /home/team10/Documents
-    - type: bind
-      source: /home/team10
-      target: /home/team10
+    #command: ros2 run joy joy_node 
     command: ros2 launch teleop_twist_joy teleop-launch.py
-
     device_cgroup_rules: #alternative to devices
       - 'c 4:63 rmw'
       - 'c 188:0 rmw'

@@ -70,25 +70,30 @@ class ControlNode(Node):
         cur_long = msg.longitude
         
         if (type(cur_lat) == str or int(cur_lat) != -31):
+            
             return
         if self.lat == 0 or self.long == 0:
+            print('set current gps')
             self.lat = cur_lat
             self.long = cur_long
             return
 
         if self.drive_mode != DRIVE_MODE.AUTO:
+            #print('not Driving', self.drive_mode)
             return
         if not self.trigger:
+            #print('not trigger', self.trigger)
             return
 
-        if not self.angle_counter >=0:
+        if self.angle_counter >=0:
             # on Turning
+            #print("on Turning", self_counter)
             return
         
         target_lat = WAY_POINTS[self.current_point][0]
         target_long = WAY_POINTS[self.current_point][1]
         tart_dist, target_angle = self.get_relative_dist(cur_lat, target_lat, cur_long, target_long)
-        
+        print('tart_dist',tart_dist, 'target_angle',target_angle)
         # check goal
         if tart_dist <= DEST_MARGIN:
             print('Arrive: ', self.current_point)
@@ -104,7 +109,7 @@ class ControlNode(Node):
         # calc angle
         dist, angle = self.get_relative_dist(self.lat, cur_lat, self.long, cur_long)
 
-        
+        print('dist', dist, 'angle', angle)
         if not self.is_start and self.following_mode != FOWLLOW_MODE.FINDING:
             self.is_start = True
             self.following_mode = FOWLLOW_MODE.FOLLOWING
@@ -165,14 +170,36 @@ class ControlNode(Node):
         if (msg.buttons[1]): # B Circle
             print('Button 1')
             self.drive_mode = DRIVE_MODE.MANUAL
-        elif (msg.buttons[2]): # X Square
-            print('Button 2')
+        elif (msg.buttons[2]): # Square
+            print('Button 2 - auto', 'trigger ', self.trigger)
             self.drive_mode = DRIVE_MODE.AUTO
+            
         elif (msg.buttons[3]):
             print('Button 3')
-        elif (msg.button[4]):
-            print('Button 4')
+            self.angle = 0
+            self.angle_counter = -1
             
+            
+        elif (msg.buttons[4]):
+            print('Button 4')
+        elif (msg.buttons[11]):
+            print('Button 11 - up')
+            control_msg = self.convert_msg(0.5, 0.0)
+            self.robot_pub.publish(control_msg)
+        elif (msg.buttons[13]):
+            if (self.angle_counter >= 0):
+                return
+            print('Button 13 - LEFT')
+            self.turn_robot(10)
+        elif (msg.buttons[14]):
+            if (self.angle_counter >= 0):
+                return
+            print('Button 14 - RIGHT')
+            self.turn_robot(-10)
+        
+        
+        if (self.drive_mode == DRIVE_MODE.MANUAL):
+            return
         if (msg.axes[5] < 0):
             self.trigger = True
         else:
@@ -181,6 +208,7 @@ class ControlNode(Node):
             if (self.linear != 0.0 or self.angualr != 0.0):
                 control_msg = self.convert_msg(0.0, 0.0)
                 self.robot_pub.publish(control_msg)
+            self.angle_counter = -1
 
     def twist_cb(self, msg):
         if (self.drive_mode == DRIVE_MODE.MANUAL):
@@ -202,6 +230,10 @@ class ControlNode(Node):
             self.robot_pub.publish(control_msg)
             self.turning_angle = 0
             self.angle_counter = -1
+            print('Turn Finish')
+            return
+        
+        self.angle_counter += 1
 
     def convert_msg(self, linear:float, angular:float):
         msg = Twist()
