@@ -64,6 +64,7 @@ class ControlNode(Node):
         
         self.angle_counter = -1
         self.turning_angle = 0
+
         
                 
     def gps_callback(self, msg):
@@ -71,7 +72,7 @@ class ControlNode(Node):
         cur_lat = msg.latitude
         cur_long = msg.longitude
         
-        if (type(cur_lat) == str or int(cur_lat) != -31):
+        if (type(cur_lat) == str or math.isnan(cur_lat) or int(cur_lat) != -31):
             
             return
         if self.lat == 0 or self.long == 0:
@@ -94,11 +95,12 @@ class ControlNode(Node):
         
         target_lat = WAY_POINTS[self.current_point][0]
         target_long = WAY_POINTS[self.current_point][1]
-        tart_dist, target_angle = self.get_relative_dist(cur_lat, target_lat, cur_long, target_long)
-        print('tart_dist',tart_dist, 'target_angle',target_angle)
+        tart_dist, target_angle, rot = self.get_relative_dist(cur_lat, target_lat, cur_long, target_long)
+        print('tart_dist',tart_dist, 'target_angle',target_angle, 'rot', rot)
         # check goal
         if tart_dist <= DEST_MARGIN:
             print('Arrive: ', self.current_point)
+            
             control_msg = self.convert_msg(0.0, 0.0)
             self.robot_pub.publish(control_msg)
             self.is_start = False
@@ -107,20 +109,19 @@ class ControlNode(Node):
             self.current_point += 1
             return
              
-
-        # calc angle
-        dist, angle = self.get_relative_dist(self.lat, cur_lat, self.long, cur_long)
-
-        print('dist', dist, 'angle', angle)
         if not self.is_start and self.following_mode != FOWLLOW_MODE.FINDING:
             self.is_start = True
             self.following_mode = FOWLLOW_MODE.FOLLOWING
-            if abs(target_angle - self.angle) < ANGLE_MARGIN:
+            if abs(rot) < ANGLE_MARGIN:
                 return
             # Turning
-            self.turn_robot(target_angle)
+            self.turn_robot(rot)
             return
         
+        
+        # calc angle
+        dist, angle, _ = self.get_relative_dist(self.lat, cur_lat, self.long, cur_long)
+        print('dist', dist, 'angle', angle)
         if dist >= DIST_MIN:
             self.angle = angle
             self.lat = cur_lat
@@ -163,7 +164,14 @@ class ControlNode(Node):
         angle = math.atan2(y_distance, x_distance)
         angle = math.degrees(angle)
         dist = math.sqrt(y_distance*y_distance + x_distance*x_distance)
-        return  dist, angle
+        
+        rot = int(angle - self.angle)
+        if (rot > 180):
+            rot = rot - 360
+        elif (rot < -180):
+            rot = rot + 360
+            
+        return  dist, angle, rot
         #x_distance = x_difference * 111.320 * (math.cos(y_difference * math.pi / 180)) *1000
 
     
@@ -198,8 +206,6 @@ class ControlNode(Node):
                 return
             print('Button 14 - RIGHT')
             self.turn_robot(-10)
-        
-        
 
         if (msg.axes[5] < 0):
             self.trigger = True
