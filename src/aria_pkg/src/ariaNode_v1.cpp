@@ -14,6 +14,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/twist.hpp>
+#include <std_msgs/msg/int32.hpp>
 
 # include "Aria/Aria.h"
 
@@ -36,7 +37,14 @@ class ariaNode : public rclcpp::Node {
 
             cmdVelSub = create_subscription<geometry_msgs::msg::Twist> (
                 "cmd_vel_team10", 10, std::bind(&ariaNode::cmdVelCallback, this, std::placeholders::_1)
-            );    
+            );
+            heartbeatSub = create_subscription<std_msgs::msg::Int32> (
+                "heartbeat_team10", 10, std::bind(&ariaNode::heartbeatCallback, this, std::placeholders::_1)
+            );
+
+            timer_ = this->create_wall_timer(
+                    1000, // Timer period (500 milliseconds)
+                    std::bind(&ariaNode::heartbeat_timer_callback, this));
         }
 
     private:
@@ -53,9 +61,28 @@ class ariaNode : public rclcpp::Node {
             printf("message received.%lf, %lf\n", linearSpeed, angularSpeed);
         }
 
+        
+        void heartbeatCallback(const std_msgs::msg::Int32::SharedPtr msg)
+        {
+            heartbeat = 1
+        }
+
+        void heartbeat_timer_callback()
+        {
+            printf("heartbeat (%d)\n", heartbeat)
+            if (heartbeat == 1) {
+                *currentForwardSpeed = 0.0f;
+                *currentRotationSpeed = 0.0f;
+            }
+            heartbeat = 0
+        }
+
         rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmdVelSub;
+        rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr heartbeatSub;
         float* currentForwardSpeed;
         float* currentRotationSpeed;
+        rclcpp::TimerBase::SharedPtr timer_;
+        int heartbeat = 0;
     
 };
 

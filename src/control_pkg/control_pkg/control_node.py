@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String, Float32
+from std_msgs.msg import String, Float32, Int32
 from gps_msgs.msg import GPSFix
 #from interfaces.msg import Gpsx
 from gpsx.msg import Gpsx
@@ -41,9 +41,11 @@ class ControlNode(Node):
         
         # Publisher
         self.robot_pub = self.create_publisher(Twist, 'cmd_vel_team10', 10)
+        self.heartbeat_pub = self.create_publisher(Int32, 'heartbeat_team10', 10)
         
         # Timer
         self.create_timer(0.04, self.timer_cb)
+        self.create_timer(0.25, self.heartbeat_timer_cb)
         
         # Variables
         self.lat = 0
@@ -234,6 +236,11 @@ class ControlNode(Node):
             return
         
         self.angle_counter += 1
+
+    def heartbeat_timer_cb(self):
+        heartbeat_msg = Int32()
+        heartbeat_msg.data = 1
+        self.heartbeat_pub.publish(heartbeat_msg)
 
     def convert_msg(self, linear:float, angular:float):
         msg = Twist()
