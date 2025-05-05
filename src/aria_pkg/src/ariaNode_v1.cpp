@@ -43,7 +43,7 @@ class ariaNode : public rclcpp::Node {
             );
 
             timer_ = this->create_wall_timer(
-                    1000, // Timer period (500 milliseconds)
+                    1s, // Timer period (500 milliseconds)
                     std::bind(&ariaNode::heartbeat_timer_callback, this));
         }
 
@@ -64,17 +64,17 @@ class ariaNode : public rclcpp::Node {
         
         void heartbeatCallback(const std_msgs::msg::Int32::SharedPtr msg)
         {
-            heartbeat = 1
+            heartbeat = msg->data;
         }
 
         void heartbeat_timer_callback()
         {
-            printf("heartbeat (%d)\n", heartbeat)
-            if (heartbeat == 1) {
+            //printf("heartbeat (%d)\n", heartbeat);
+            if (heartbeat == 0) {
                 *currentForwardSpeed = 0.0f;
                 *currentRotationSpeed = 0.0f;
             }
-            heartbeat = 0
+            heartbeat = 0;
         }
 
         rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmdVelSub;

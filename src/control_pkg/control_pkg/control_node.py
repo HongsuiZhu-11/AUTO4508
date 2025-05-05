@@ -170,7 +170,7 @@ class ControlNode(Node):
     def joy_cb(self, msg):
         #print(msg)
         if (msg.buttons[1]): # B Circle
-            print('Button 1')
+            print('Button 1 - manual', 'trigger ', self.trigger)
             self.drive_mode = DRIVE_MODE.MANUAL
         elif (msg.buttons[2]): # Square
             print('Button 2 - auto', 'trigger ', self.trigger)
@@ -200,8 +200,7 @@ class ControlNode(Node):
             self.turn_robot(-10)
         
         
-        if (self.drive_mode == DRIVE_MODE.MANUAL):
-            return
+
         if (msg.axes[5] < 0):
             self.trigger = True
         else:
@@ -239,7 +238,10 @@ class ControlNode(Node):
 
     def heartbeat_timer_cb(self):
         heartbeat_msg = Int32()
-        heartbeat_msg.data = 1
+        if (self.trigger):
+            heartbeat_msg.data = 1
+        else:
+            heartbeat_msg.data = 0
         self.heartbeat_pub.publish(heartbeat_msg)
 
     def convert_msg(self, linear:float, angular:float):
