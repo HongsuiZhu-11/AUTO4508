@@ -8,7 +8,7 @@ void signalHandler(int)
 }
 
 AriaNode::AriaNode(int &argc, char **argv)
-	: Node("aria_node")
+	: Node("ariaNode")
 	, robot_()
 	, stop_requested_(false)
 {
@@ -28,7 +28,17 @@ AriaNode::AriaNode(int &argc, char **argv)
 
 	gps_sub_ = create_subscription<sensor_msgs::msg::NavSatFix>(
 		"/fix", 10,
-		std::bind(&AriaNode::onGPS, this, std::placeholders::_1));
+		std::bind(&AriaNode::gps_cb, this, std::placeholders::_1));
+
+	joy_sub_ = create_subscription<sensor_msgs::msg::Joy>(
+		"joy", 10,
+		std::bind(&AriaNode::joy_cb, this, std::placeholders::_1));
+
+	cmd_vel_sub_ = create_subscription<geometry_msgs::msg::Twist>(
+		"cmd_vel_team10", 10,
+		std::bind(&AriaNode::cmd_vel_cb, this, std::placeholders::_1));
+
+	last_joy_time_ = now();
 
 	waypoints_ = { { 1000, 500, 0, 200, 0, 0 },
 		       { 1000, 1000, 0, 200, 0, 0 },
@@ -46,10 +56,43 @@ AriaNode::~AriaNode()
 	Aria::exit(0);
 }
 
-void AriaNode::onGPS(const sensor_msgs::msg::NavSatFix::SharedPtr msg)
+void AriaNode::gps_cb(const sensor_msgs::msg::NavSatFix::SharedPtr msg)
 {
 	RCLCPP_INFO(get_logger(), "GPS: lat=%.6f lon=%.6f alt=%.2f",
 		    msg->latitude, msg->longitude, msg->altitude);
+}
+
+void AriaNode::joy_cb(const sensor_msgs::msg::Joy::SharedPtr msg)
+{
+	last_joy_time_ = now();
+
+	// Mode toggles (button-press events)
+	if (msg->buttons[BUTTON_X]) {
+		auto_mode_ = true;
+		manual_mode_ = false;
+		RCLCPP_INFO(get_logger(), "Automated mode ENABLED");
+	}
+	if (msg->buttons[BUTTON_O]) {
+		manual_mode_ = true;
+		auto_mode_ = false;
+		RCLCPP_INFO(get_logger(), "Manual mode ENABLED");
+	}
+
+	deadman_trigger = msg->buttons[PEDAL_R_AXIS];
+
+	if (manual_mode_) {
+		float fwd = -msg->axes[AXIS_FORWARD];
+		float str = msg->axes[AXIS_STEER];
+		currentForwardSpeed = (std::fabs(fwd) > 0.05f) ? fwd : 0.0f;
+		currentRotationSpeed = (std::fabs(str) > 0.05f) ? str : 0.0f;
+	}
+}
+
+void AriaNode::cmd_vel_cb(const geometry_msgs::msg::Twist::SharedPtr msg)
+{
+	currentForwardSpeed = msg->linear.x;
+	currentRotationSpeed = msg->angular.z;
+	last_joy_time_ = now();
 }
 
 void AriaNode::updateData()
@@ -134,37 +177,82 @@ void AriaNode::run()
 {
 	const double goal_tol = 50.0; // mm
 	const double rot_tol = 5.0; // degrees
+	rclcpp::Rate rate(20);
 
 	for (auto &wp : waypoints_) {
 		RCLCPP_INFO(get_logger(), "Moving to (%.2f,%.2f)", wp.x, wp.y);
 		bool reached = false;
-		while (!reached && !g_stop) {
+
+		while (rclcpp::ok() && !reached) {
 			updateData();
 			logData();
 
-			double dist = calDist(data_.x, data_.y, wp.x, wp.y);
-			double heading = calTheta(data_.x, data_.y, wp.x, wp.y);
-			double diff = ArMath::subAngle(heading, data_.th);
-
-			if (std::fabs(diff) > rot_tol) {
-				double rv =
-					wp.rot_vel * (diff > 0 ? 1.0 : -1.0);
-				driveTurn(rv);
-			} else if (dist > goal_tol) {
-				driveStraight(wp.vel);
-			} else {
-				RCLCPP_INFO(get_logger(), "Reached (%.2f,%.2f)",
-					    wp.x, wp.y);
-				driveStraight(0);
-				reached = true;
-				ArUtil::sleep(2000);
+			if ((now() - last_joy_time_).seconds() > 1.0) {
+				currentForwardSpeed = 0.0f;
+				currentRotationSpeed = 0.0f;
 			}
+
+			// manual drive
+			if (manual_mode_ &&
+			    (std::abs(currentForwardSpeed) > 0.01 ||
+			     std::abs(currentRotationSpeed) > 0.01)) {
+				robot_.lock();
+				robot_.setVel(currentForwardSpeed * 500.0);
+				robot_.setRotVel(currentRotationSpeed * 50.0);
+				robot_.unlock();
+				rate.sleep();
+				continue;
+			}
+
+			// auto-drive
+			if (auto_mode_) {
+				if (!deadman_trigger) {
+					robot_.lock();
+					robot_.setVel(0.0);
+					robot_.setRotVel(0.0);
+					robot_.unlock();
+					rate.sleep();
+					continue;
+				}
+
+				// compute distance & heading error to current waypoint
+				double dist =
+					calDist(data_.x, data_.y, wp.x, wp.y);
+				double heading =
+					calTheta(data_.x, data_.y, wp.x, wp.y);
+				double diff =
+					ArMath::subAngle(heading, data_.th);
+
+				if (std::fabs(diff) > rot_tol) {
+					double rv = wp.rot_vel *
+						    (diff > 0 ? 1.0 : -1.0);
+					driveTurn(rv);
+				} else if (dist > goal_tol) {
+					driveStraight(wp.vel);
+				} else {
+					RCLCPP_INFO(get_logger(),
+						    "Reached (%.2f,%.2f)", wp.x,
+						    wp.y);
+					driveStraight(0.0);
+					ArUtil::sleep(2000);
+					reached = true;
+				}
+
+				rate.sleep();
+				continue;
+			}
+
+			// idle
+			robot_.lock();
+			robot_.setVel(0.0);
+			robot_.setRotVel(0.0);
+			robot_.unlock();
+
+			rate.sleep();
 		}
-		if (g_stop)
-			break;
 	}
 
-	RCLCPP_INFO(get_logger(), "Shutting down.");
+	RCLCPP_INFO(get_logger(), "All waypoints complete — shutting down.");
 }
 
 int main(int argc, char **argv)
