@@ -4,7 +4,8 @@ from rclpy.node import Node
 from std_msgs.msg import String, Float32, Int32
 from gps_msgs.msg import GPSFix
 #from interfaces.msg import Gpsx
-from gpsx.msg import Gpsx
+#from gpsx.msg import Gpsx
+from sensor_msgs.msg import NavSatFix
 from sensor_msgs.msg import Joy
 from geometry_msgs.msg import Twist
 
@@ -34,7 +35,7 @@ class ControlNode(Node):
         super().__init__("Control_Node")
         
         # Subscribers 
-        self.create_subscription(Gpsx, "gpsx", self.gps_callback, 10)
+        self.create_subscription(NavSatFix, "fix", self.gps_callback, 10)
         self.create_subscription(Joy, "joy", self.joy_cb, 10)
         self.create_subscription(Twist, "cmd_vel", self.twist_cb, 10)
         
