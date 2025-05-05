@@ -95,6 +95,21 @@ void AriaNode::cmd_vel_cb(const geometry_msgs::msg::Twist::SharedPtr msg)
 	last_joy_time_ = now();
 }
 
+void heartbeatCallback(const std_msgs::msg::Int32::SharedPtr msg)
+{
+	heartbeat = msg->data;
+}
+
+void heartbeat_timer_callback()
+{
+	//printf("heartbeat (%d)\n", heartbeat);
+	if (heartbeat == 0) {
+		*currentForwardSpeed = 0.0f;
+		*currentRotationSpeed = 0.0f;
+	}
+	heartbeat = 0;
+}
+
 void AriaNode::updateData()
 {
 	robot_.lock();
@@ -187,6 +202,7 @@ void AriaNode::run()
 			updateData();
 			logData();
 
+			
 			if ((now() - last_joy_time_).seconds() > 1.0) {
 				currentForwardSpeed = 0.0f;
 				currentRotationSpeed = 0.0f;

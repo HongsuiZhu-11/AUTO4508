@@ -26,10 +26,15 @@ class AriaNode : public rclcpp::Node {
 	rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr gps_sub_;
 	rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
 	rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
+	rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmdVelSub;
+	rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr heartbeatSub;
 
 	bool enabled_ = false;
 	float currentForwardSpeed = 0.0f;
 	float currentRotationSpeed = 0.0f;
+	rclcpp::TimerBase::SharedPtr timer_;
+	int heartbeat = 0;
+
 
 	// Joystick state
 	rclcpp::Time last_joy_time_;
@@ -61,6 +66,8 @@ class AriaNode : public rclcpp::Node {
 	void gps_cb(const sensor_msgs::msg::NavSatFix::SharedPtr msg);
 	void cmd_vel_cb(const geometry_msgs::msg::Twist::SharedPtr msg);
 	void joy_cb(const sensor_msgs::msg::Joy::SharedPtr msg);
+	void heartbeatCallback(const std_msgs::msg::Int32::SharedPtr msg);
+	void heartbeat_timer_callback();
 
 	void updateData();
 	void logData();
