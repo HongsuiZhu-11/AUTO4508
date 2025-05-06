@@ -25,13 +25,12 @@ class YoloCenterDetector(Node):
         self.subscription = self.create_subscription(Image, '/camera/image_raw', self.image_callback, 10)
         self.publisher_ = self.create_publisher(String, '/target_detected', 10)
 
-        # 获取模型路径
         model_path = os.path.join(pkg_resources.resource_filename('vision_yolo_detector', 'model'), 'best.pt')
         self.model = YOLO(model_path)
 
         os.makedirs("center_detected_images", exist_ok=True)
-        self.processed_once = False  # ✅ 只处理一次
-        self.get_logger().info("🚀 YOLO center-focused detector started.")
+        self.processed_once = False
+        self.get_logger().info("🚀 YOLO center-focused detector started and waiting for image...")
 
     def image_callback(self, msg):
         if self.processed_once:
@@ -65,13 +64,11 @@ class YoloCenterDetector(Node):
                 closest_box = (x1, y1, x2, y2)
 
         annotated = frame.copy()
-
         if closest_label:
             x1, y1, x2, y2 = closest_box
             color = CLASS_COLORS[closest_label]
             cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
             cv2.putText(annotated, f"{closest_label}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-
             filename = f"center_detected_images/{closest_label}_{datetime.now().strftime('%H%M%S')}.jpg"
             cv2.imwrite(filename, annotated)
             self.publisher_.publish(String(data=closest_label))
@@ -80,9 +77,7 @@ class YoloCenterDetector(Node):
             self.publisher_.publish(String(data="None"))
             self.get_logger().info("❌ No valid target detected at center.")
 
-        self.get_logger().info("🛑 Detection complete. Shutting down node.")
-        rclpy.shutdown()  # ✅ 自动关闭节点
-
+        # 🚫 不再调用 rclpy.shutdown()，让节点保持运行
 
 def main(args=None):
     rclpy.init(args=args)
