@@ -16,6 +16,8 @@ class ColorShapeDetector(Node):
         self.get_logger().info("🎯 Color+Shape detector started.")
 
     def image_callback(self, msg):
+        self.get_logger().info("📥 Received one image. Processing...")
+
         frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         detections = self.detect_objects_by_color_shape(frame)
         annotated = frame.copy()
@@ -28,6 +30,12 @@ class ColorShapeDetector(Node):
         filename = f"detected_images/detect_{datetime.now().strftime('%H%M%S')}.jpg"
         cv2.imwrite(filename, annotated)
         self.get_logger().info(f"📸 Saved image with {len(detections)} detections → {filename}")
+
+        # ✅ 取消订阅并关闭节点（只处理一次）
+        self.destroy_subscription(self.subscription)
+        self.get_logger().info("👋 Shutting down after one detection.")
+        rclpy.shutdown()
+
 
     def detect_objects_by_color_shape(self, frame):
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
