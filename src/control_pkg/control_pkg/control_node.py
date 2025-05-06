@@ -7,17 +7,21 @@ from gps_msgs.msg import GPSFix
 #from gpsx.msg import Gpsx
 from sensor_msgs.msg import NavSatFix
 from sensor_msgs.msg import Joy
+from sensor_msgs.msg import laser_scan
 from geometry_msgs.msg import Twist
 
 from enum import Enum
 import math
-
 
 WAY_POINTS = [(-31.980327, 115.817317), (-31.980554, 115.817743), (-31.980368, 115.818476)]
 
 DIST_MIN = 1
 DEST_MARGIN = 0.5
 ANGLE_MARGIN = 5
+
+# Lidar has some 0 reads and detects it's back plate, threshold in meters for minimum acceptable readings
+MIN_LIDAR_MARGIN = 0.1
+LIDAR_STOP_DISTANCE = 0.5
 
 class DRIVE_MODE(Enum):
     NONE = 1000
@@ -29,6 +33,42 @@ class FOWLLOW_MODE(Enum):
     NONE = 3000
     FOLLOWING = 3001
     FINDING = 3002
+
+class LidarScan:
+    def __init__(self):
+        self.angle_min = 0.0
+        self.angle_max = 0.0
+        self.angle_increment = 0.0
+        self.ranges = []
+    
+    def scan_update(self, angle_min, angle_max, angle_increment, ranges):
+        self.angle_min = angle_min
+        self.angle_max = angle_max
+        self.angle_increment = angle_increment
+        self.ranges = ranges
+        
+    def get_distance(self, angle_degrees):
+        # Normalize angle to [-180, 180]
+        angle_degrees = (angle_degrees + 180) % 360 - 180
+        
+        # Convert degrees to radians
+        angle_radians = math.radians(angle_degrees)
+
+        # Compute index
+        if self.angle_increment == 0 or not self.ranges:
+            return -1.0
+
+        index = int((angle_radians - self.angle_min) / self.angle_increment)
+        
+        if 0 <= index < len(self.ranges) and math.isfinite(self.ranges[index]):
+            return self.ranges[index]
+        return -1.0
+    
+    def get_min_range(self):
+        if not self.ranges:
+            return -1.0
+        return min((r for r in self.ranges if r > MIN_LIDAR_MARGIN), default=-1.0)
+
  
 class ControlNode(Node): 
     def __init__(self):
@@ -38,6 +78,7 @@ class ControlNode(Node):
         self.create_subscription(NavSatFix, "fix", self.gps_callback, 10)
         self.create_subscription(Joy, "joy", self.joy_cb, 10)
         self.create_subscription(Twist, "cmd_vel", self.twist_cb, 10)
+        self.create_subscription(laser_scan, "scan", self.lidar_cb, 10)
         
         
         # Publisher
@@ -53,6 +94,9 @@ class ControlNode(Node):
         self.long = 0
         self.angle = 0
         self.is_start = False
+
+        # Lidar object
+        self.lidar_scan = LidarScan()
         
         self.current_point = 0
         
@@ -66,6 +110,24 @@ class ControlNode(Node):
         self.angle_counter = -1
         self.turning_angle = 0
 
+    def lidar_cb(self, msg):
+        #print(msg)
+        self.lidar_scan.scan_update(msg.angle_min, msg.angle_max, msg.angle_increment, msg.ranges)
+        #print('lidar', self.lidar_scan.get_distance(0))
+        #print('lidar', self.lidar_scan.get_min_range())
+        
+        if (self.drive_mode == DRIVE_MODE.MANUAL):
+            return
+        
+        # Given the lidar data, check if there is an obstacle in front of the robot
+        # and stop the robot if there is one
+        if (self.drive_mode == DRIVE_MODE.AUTO and self.trigger):
+            min_range = self.lidar_scan.get_min_range()
+            if (min_range < LIDAR_STOP_DISTANCE):
+                print('Obstacle detected')
+                control_msg = self.convert_msg(0.0, 0.0)
+                self.robot_pub.publish(control_msg)
+                return
         
                 
     def gps_callback(self, msg):
