@@ -20,6 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-        ],
-    },
+            'display_node = display_pkg.camera_viewer:main',
+    ],
+},
+
 )
