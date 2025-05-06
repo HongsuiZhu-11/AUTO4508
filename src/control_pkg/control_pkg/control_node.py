@@ -227,9 +227,15 @@ class ControlNode(Node):
         
         # update current angle
         if (self.turning_angle < 0):
-            self.angle = self.angle - self.angle_counter
+            if (self.angle <= -179):
+                self.angle = 180
+            else:
+                self.angle = self.angle - self.angle_counter
         else:
-            self.angle = self.angle + self.angle_counter
+            if (self.angle >= 180):
+                self.angle = -179
+            else:
+                self.angle = self.angle + self.angle_counter
         
         if (self.angle_counter >= abs(self.turning_angle)):
             # stop
@@ -237,7 +243,7 @@ class ControlNode(Node):
             self.robot_pub.publish(control_msg)
             self.turning_angle = 0
             self.angle_counter = -1
-            print('Turn Finish')
+            print('Turn Finish - current angle: ', self.angle)
             return
         
         self.angle_counter += 1
