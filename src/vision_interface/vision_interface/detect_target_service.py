@@ -9,8 +9,8 @@ import os
 
 # HSV color ranges
 COLOR_RANGES = {
-    'cone_orange': {'lower': [10, 100, 100], 'upper': [30, 255, 255]},
-    'cone_yellowgreen': {'lower': [30, 50, 50], 'upper': [80, 255, 255]},
+    'cone_orange': {'lower': [5, 100, 100], 'upper': [20, 255, 255]},
+    'cone_yellowgreen': {'lower': [25, 80, 80], 'upper': [75, 255, 255]},
     'bucket_red': {'lower': [0, 100, 100], 'upper': [10, 255, 255]},
 }
 
@@ -24,20 +24,37 @@ def detect_target(rgb, depth, spatial):
     for label, ranges in COLOR_RANGES.items():
         mask = cv2.inRange(hsv, np.array(ranges['lower']), np.array(ranges['upper']))
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        candidates = []
         for c in contours:
-            if cv2.contourArea(c) < 500:
+            if cv2.contourArea(c) < 800:
                 continue
+            approx = cv2.approxPolyDP(c, 0.03 * cv2.arcLength(c, True), True)
             x, y, bw, bh = cv2.boundingRect(c)
             cx, cy = x + bw // 2, y + bh // 2
             if abs(cx - cx_frame) < CENTER_TOLERANCE and abs(cy - cy_frame) < CENTER_TOLERANCE:
-                coord = spatial[cy, cx]
-                distance = coord[2]
-                return {
-                    'label': label,
-                    'coords': coord,
-                    'distance': distance,
-                    'image': rgb
-                }
+                if label in ['cone_orange', 'cone_yellowgreen'] and 3 <= len(approx) <= 6:
+                    candidates.append((cv2.contourArea(c), (x, y, bw, bh), (cx, cy), c))
+                elif label == 'bucket_red' and len(approx) > 4:
+                    candidates.append((cv2.contourArea(c), (x, y, bw, bh), (cx, cy), c))
+
+        if candidates:
+            candidates.sort(reverse=True)
+            _, (x, y, bw, bh), (cx, cy), best_contour = candidates[0]
+            coord = spatial[cy, cx]
+            distance = coord[2]
+
+            # Draw result
+            cv2.drawContours(rgb, [best_contour], -1, (0, 255, 0), 2)
+            cv2.circle(rgb, (cx, cy), 5, (0, 0, 255), -1)
+            cv2.putText(rgb, label, (x, y - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
+            return {
+                'label': label,
+                'coords': coord,
+                'distance': distance,
+                'image': rgb
+            }
     return None
 
 class DetectTargetNode(Node):
@@ -61,7 +78,7 @@ class DetectTargetNode(Node):
                 result = detect_target(rgb, depth, spatial)
                 if result:
                     ts = int(time.time())
-                    img_path = f'/output/{result["label"]}_{ts}.jpg'
+                    img_path = f'/output/{result["label"]}_{ts}_marked.jpg'
                     os.makedirs('/output', exist_ok=True)
                     cv2.imwrite(img_path, result['image'])
                     result_data.update({
@@ -86,3 +103,12 @@ class DetectTargetNode(Node):
         else:
             response.success = False
         return response
+
+def main():
+    rclpy.init()
+    node = DetectTargetNode()
+    rclpy.spin(node)
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
