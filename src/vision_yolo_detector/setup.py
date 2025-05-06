@@ -1,15 +1,17 @@
-from setuptools import setup
-import glob
+from setuptools import setup, find_packages
 
 package_name = 'vision_yolo_detector'
 
 setup(
     name=package_name,
     version='0.1.0',
-    packages=[package_name],
+    packages=find_packages(),  # 自动发现 vision_yolo_detector
+    include_package_data=True,  # 启用 package_data
+    package_data={
+        package_name: ['model/*.pt'],  # 包含模型文件
+    },
     data_files=[
         ('share/' + package_name, ['package.xml', 'setup.cfg']),
-        ('share/' + package_name + '/model', glob.glob('vision_yolo_detector/model/*')),
     ],
     install_requires=[
         'setuptools',
@@ -19,7 +21,7 @@ setup(
         'opencv-python',
     ],
     zip_safe=True,
-    maintainer='Your Name',
+    maintainer='Hongsui Zhu',
     maintainer_email='you@example.com',
     description='YOLOv8 detector node for cone/bucket identification',
     license='MIT',
