@@ -1,9 +1,0 @@
-# 请求为空
----
-bool success
-string label
-float32 distance
-float32 world_x
-float32 world_y
-float32 world_z
-string image_path
