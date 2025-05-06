@@ -7,11 +7,13 @@ from gps_msgs.msg import GPSFix
 #from gpsx.msg import Gpsx
 from sensor_msgs.msg import NavSatFix
 from sensor_msgs.msg import Joy
-from sensor_msgs.msg import laser_scan
+from sensor_msgs.msg import LaserScan
+
 from geometry_msgs.msg import Twist
 
 from enum import Enum
 import math
+
 
 WAY_POINTS = [(-31.980327, 115.817317), (-31.980554, 115.817743), (-31.980368, 115.818476)]
 
@@ -33,7 +35,7 @@ class FOWLLOW_MODE(Enum):
     NONE = 3000
     FOLLOWING = 3001
     FINDING = 3002
-
+ 
 class LidarScan:
     def __init__(self):
         self.angle_min = 0.0
@@ -69,7 +71,7 @@ class LidarScan:
             return -1.0
         return min((r for r in self.ranges if r > MIN_LIDAR_MARGIN), default=-1.0)
 
- 
+
 class ControlNode(Node): 
     def __init__(self):
         super().__init__("Control_Node")
@@ -78,12 +80,12 @@ class ControlNode(Node):
         self.create_subscription(NavSatFix, "fix", self.gps_callback, 10)
         self.create_subscription(Joy, "joy", self.joy_cb, 10)
         self.create_subscription(Twist, "cmd_vel", self.twist_cb, 10)
-        self.create_subscription(laser_scan, "scan", self.lidar_cb, 10)
-        
+        self.create_subscription(LaserScan, "scan", self.lidar_cb, 10)
         
         # Publisher
         self.robot_pub = self.create_publisher(Twist, 'cmd_vel_team10', 10)
         self.heartbeat_pub = self.create_publisher(Int32, 'heartbeat_team10', 10)
+        # self.report_pub = self.create_publisher(String, 'report_team10', 10)
         
         # Timer
         self.create_timer(0.04, self.timer_cb)
@@ -94,9 +96,6 @@ class ControlNode(Node):
         self.long = 0
         self.angle = 0
         self.is_start = False
-
-        # Lidar object
-        self.lidar_scan = LidarScan()
         
         self.current_point = 0
         
@@ -109,25 +108,8 @@ class ControlNode(Node):
         
         self.angle_counter = -1
         self.turning_angle = 0
-
-    def lidar_cb(self, msg):
-        #print(msg)
-        self.lidar_scan.scan_update(msg.angle_min, msg.angle_max, msg.angle_increment, msg.ranges)
-        #print('lidar', self.lidar_scan.get_distance(0))
-        #print('lidar', self.lidar_scan.get_min_range())
         
-        if (self.drive_mode == DRIVE_MODE.MANUAL):
-            return
-        
-        # Given the lidar data, check if there is an obstacle in front of the robot
-        # and stop the robot if there is one
-        if (self.drive_mode == DRIVE_MODE.AUTO and self.trigger):
-            min_range = self.lidar_scan.get_min_range()
-            if (min_range < LIDAR_STOP_DISTANCE):
-                print('Obstacle detected')
-                control_msg = self.convert_msg(0.0, 0.0)
-                self.robot_pub.publish(control_msg)
-                return
+        self.lidar = LidarScan()
         
                 
     def gps_callback(self, msg):
@@ -167,7 +149,11 @@ class ControlNode(Node):
             self.robot_pub.publish(control_msg)
             self.is_start = False
             # TODO Find Optical
-            #self.following_mode = FOWLLOW_MODE.FINDING
+            # while Object not not in center of frame
+            #   Turn toward Object
+            #       read Lidar at 0 (forward)
+
+            # self.following_mode = FOWLLOW_MODE.FINDING
             self.current_point += 1
             return
              
@@ -236,6 +222,24 @@ class ControlNode(Node):
         return  dist, angle, rot
         #x_distance = x_difference * 111.320 * (math.cos(y_difference * math.pi / 180)) *1000
 
+    def lidar_cb(self, msg):
+        #print(msg)
+        self.lidar.scan_update(msg.angle_min, msg.angle_max, msg.angle_increment, msg.ranges)
+        #print('lidar', self.lidar.get_distance(0))
+        #print('lidar', self.lidar.get_min_range())
+        
+        if (self.drive_mode == DRIVE_MODE.MANUAL):
+            return
+        
+        # Given the lidar data, check if there is an obstacle in front of the robot
+        # and stop the robot if there is one
+        if (self.drive_mode == DRIVE_MODE.AUTO and self.trigger):
+            min_range = self.lidar.get_min_range()
+            if (min_range < LIDAR_STOP_DISTANCE):
+                print('Obstacle detected')
+                control_msg = self.convert_msg(0.0, 0.0)
+                self.robot_pub.publish(control_msg)
+                return
     
     def joy_cb(self, msg):
         #print(msg)
