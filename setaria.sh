@@ -15,9 +15,8 @@ export PYTHONPATH=$PYTHONPATH:/home/team10/ws/AriaCoda/python
 # ros2 run aria_pkg ariaNode -robotPort /dev/ttyUSB0
 
 # 2. run gps node
-# in ros2GPSx path
-# source install/setup.bash
-# ros2 run gpsx gps_node --ros-args -p "comm_port:=/dev/ttyACM0"
+# sudo apt install ros-jazzy-ublox-gps ros-jazzy-ublox-msgs
+# ros2 launch ublox_gps ublox_gps_node-launch.py
 
 # 3. run control node
 # in control_pkg path
