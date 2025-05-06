@@ -25,17 +25,19 @@ class YoloCenterDetector(Node):
         self.subscription = self.create_subscription(Image, '/camera/image_raw', self.image_callback, 10)
         self.publisher_ = self.create_publisher(String, '/target_detected', 10)
 
-        # 获取模型路径（从包内路径）
-        model_path = os.path.join(
-            pkg_resources.resource_filename('vision_yolo_detector', 'model'),
-            'best.pt'
-        )
+        # 获取模型路径
+        model_path = os.path.join(pkg_resources.resource_filename('vision_yolo_detector', 'model'), 'best.pt')
         self.model = YOLO(model_path)
 
         os.makedirs("center_detected_images", exist_ok=True)
+        self.processed_once = False  # ✅ 只处理一次
         self.get_logger().info("🚀 YOLO center-focused detector started.")
 
     def image_callback(self, msg):
+        if self.processed_once:
+            return
+        self.processed_once = True
+
         frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         results = self.model(frame)[0]
 
@@ -49,7 +51,6 @@ class YoloCenterDetector(Node):
         for box in results.boxes:
             cls_id = int(box.cls[0])
             label = self.model.names[cls_id]
-
             if label not in TARGET_CLASSES:
                 continue
 
@@ -64,7 +65,6 @@ class YoloCenterDetector(Node):
                 closest_box = (x1, y1, x2, y2)
 
         annotated = frame.copy()
-        filename = None
 
         if closest_label:
             x1, y1, x2, y2 = closest_box
@@ -79,6 +79,10 @@ class YoloCenterDetector(Node):
         else:
             self.publisher_.publish(String(data="None"))
             self.get_logger().info("❌ No valid target detected at center.")
+
+        self.get_logger().info("🛑 Detection complete. Shutting down node.")
+        rclpy.shutdown()  # ✅ 自动关闭节点
+
 
 def main(args=None):
     rclpy.init(args=args)
