@@ -15,8 +15,8 @@ import math
 
 WAY_POINTS = [(-31.980327, 115.817317), (-31.980554, 115.817743), (-31.980368, 115.818476)]
 
-DIST_MIN = 1
-DEST_MARGIN = 0.5
+DIST_MIN = 10
+DEST_MARGIN = 3
 ANGLE_MARGIN = 5
 
 class DRIVE_MODE(Enum):
@@ -74,7 +74,6 @@ class ControlNode(Node):
         cur_long = msg.longitude
         
         if (type(cur_lat) == str or math.isnan(cur_lat) or int(cur_lat) != -31):
-            
             return
         if self.lat == 0 or self.long == 0:
             print('set current gps')
@@ -97,7 +96,7 @@ class ControlNode(Node):
         target_lat = WAY_POINTS[self.current_point][0]
         target_long = WAY_POINTS[self.current_point][1]
         tart_dist, target_angle, rot = self.get_relative_dist(cur_lat, target_lat, cur_long, target_long)
-        print('tart_dist',tart_dist, 'target_angle',target_angle, 'rot', rot)
+        print('dist',tart_dist, 'angle',target_angle, 'cur_angle', self.angle, 'rot', rot)
         # check goal
         if tart_dist <= DEST_MARGIN:
             print('Arrive: ', self.current_point)
@@ -113,7 +112,7 @@ class ControlNode(Node):
         if not self.is_start and self.following_mode != FOWLLOW_MODE.FINDING:
             self.is_start = True
             self.following_mode = FOWLLOW_MODE.FOLLOWING
-            if abs(rot) < ANGLE_MARGIN:
+            if abs(rot) <= ANGLE_MARGIN:
                 return
             # Turning
             self.turn_robot(rot)
@@ -122,8 +121,8 @@ class ControlNode(Node):
         
         # calc angle
         dist, angle, _ = self.get_relative_dist(self.lat, cur_lat, self.long, cur_long)
-        print('dist', dist, 'angle', angle)
         if dist >= DIST_MIN:
+            print('Adjust - dist', dist, 'adjusted angle', angle)
             self.angle = angle
             self.lat = cur_lat
             self.long = cur_long
@@ -134,14 +133,14 @@ class ControlNode(Node):
             elif (rot < -180):
                 rot = rot + 360
                     
-            if abs(rot) < ANGLE_MARGIN:
+            if abs(rot) <= ANGLE_MARGIN:
                 return
             # Turning
             self.turn_robot(rot)
             return
         
-        # 250mm/s 
-        control_msg = self.convert_msg(0.5, 0.0)
+        # 500mm/s 
+        control_msg = self.convert_msg(1.0, 0.0)
         self.robot_pub.publish(control_msg)
 
     def turn_robot(self, angle):
@@ -160,7 +159,7 @@ class ControlNode(Node):
         y_difference = lat2 - lat1
         x_difference = long2 - long1
         y_distance = math.radians(y_difference) * R_KM * 1000
-        x_distance = math.radians(x_difference) * R_KM * math.cos(self.lat) * 1000
+        x_distance = math.radians(x_difference) * R_KM * math.cos(lat1) * 1000
         
         angle = math.atan2(y_distance, x_distance)
         angle = math.degrees(angle)
