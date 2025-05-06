@@ -74,7 +74,7 @@ class YoloCenterDetector(Node):
             self.publisher_.publish(String(data=closest_label))
             self.get_logger().info(f"✅ Detected and published: {closest_label} → Saved: {filename}")
         else:
-            self.publisher_.publish(String(data="None"))
+            self.publisher_.publish(String(data="No-target"))
             self.get_logger().info("❌ No valid target detected at center.")
 
         # 🚫 不再调用 rclpy.shutdown()，让节点保持运行
