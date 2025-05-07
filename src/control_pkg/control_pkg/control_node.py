@@ -23,7 +23,7 @@ ANGLE_MARGIN = 5
 
 # Lidar has some 0 reads and detects it's back plate, threshold in meters for minimum acceptable readings
 MIN_LIDAR_MARGIN = 0.1
-LIDAR_STOP_DISTANCE = 0.5
+LIDAR_STOP_DISTANCE = 1.0
 
 class DRIVE_MODE(Enum):
     NONE = 1000
@@ -80,6 +80,10 @@ class LidarScan:
                 cur_min_index = i
         return cur_min, cur_min_index
 
+    def get_angle_from_index(self, index):
+        if index < 0 or index >= len(self.ranges):
+            return -1.0
+        return self.angle_min + index * self.angle_increment
 
 
 class ControlNode(Node): 
@@ -165,6 +169,7 @@ class ControlNode(Node):
             # while Object not not in center of frame
             #   Turn toward Object
             #       read Lidar at 0 (forward)
+            #       
 
             # self.following_mode = FOWLLOW_MODE.FINDING
             self.current_point += 1
