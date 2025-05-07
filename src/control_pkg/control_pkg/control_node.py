@@ -151,7 +151,20 @@ class ControlNode(Node):
             offset = detected.split(',')[1]
             offset = offset[len('offset=')+1:]
             offset = int(offset)
-            
+            if (self.following_mode == FOWLLOW_MODE.FINDING):
+                if offset < -image_margin:
+                    # turn right
+                    pass
+                elif offset > image_margin:
+                    # turn left
+                    pass
+                else:
+                    control_msg = self.convert_msg(0.0, 0.0)
+                    self.robot_pub.publish(control_msg)
+                    self.angle_counter = -1
+                    self.first_turning = False
+                    detected_angle = self.lidar.get_distance(0)
+                    
             
     
     def gps_callback(self, msg):
