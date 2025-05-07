@@ -25,7 +25,7 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-add_executable(ariaNode src/ariaNode.cpp)
+add_executable(ariaNode src/ariaNode_v1.cpp)
 ament_target_dependencies(ariaNode
 "rclcpp"
 "sensor_msgs"

@@ -17,8 +17,8 @@ import math
 
 WAY_POINTS = [(-31.980327, 115.817317), (-31.980554, 115.817743), (-31.980368, 115.818476)]
 
-DIST_MIN = 1
-DEST_MARGIN = 0.5
+DIST_MIN = 100000
+DEST_MARGIN = 5
 ANGLE_MARGIN = 5
 
 # Lidar has some 0 reads and detects it's back plate, threshold in meters for minimum acceptable readings
@@ -81,6 +81,7 @@ class LidarScan:
         return cur_min, cur_min_index
 
 
+
 class ControlNode(Node): 
     def __init__(self):
         super().__init__("Control_Node")
@@ -127,17 +128,13 @@ class ControlNode(Node):
         cur_long = msg.longitude
         
         if (type(cur_lat) == str or math.isnan(cur_lat) or int(cur_lat) != -31):
-            
             return
-        if self.lat == 0 or self.long == 0:
-            print('set current gps')
-            self.lat = cur_lat
-            self.long = cur_long
-            return
+
 
         if self.drive_mode != DRIVE_MODE.AUTO:
             #print('not Driving', self.drive_mode)
             return
+        
         if not self.trigger:
             #print('not trigger', self.trigger)
             return
@@ -147,10 +144,16 @@ class ControlNode(Node):
             #print("on Turning", self_counter)
             return
         
+        if self.lat == 0 or self.long == 0:
+            print('set current gps')
+            self.lat = cur_lat
+            self.long = cur_long
+            return
+        
         target_lat = WAY_POINTS[self.current_point][0]
         target_long = WAY_POINTS[self.current_point][1]
         tart_dist, target_angle, rot = self.get_relative_dist(cur_lat, target_lat, cur_long, target_long)
-        print('tart_dist',tart_dist, 'target_angle',target_angle, 'rot', rot)
+        print('dist',tart_dist, 'angle',target_angle, 'cur_angle', self.angle, 'rot', rot)
         # check goal
         if tart_dist <= DEST_MARGIN:
             print('Arrive: ', self.current_point)
@@ -170,7 +173,7 @@ class ControlNode(Node):
         if not self.is_start and self.following_mode != FOWLLOW_MODE.FINDING:
             self.is_start = True
             self.following_mode = FOWLLOW_MODE.FOLLOWING
-            if abs(rot) < ANGLE_MARGIN:
+            if abs(rot) <= ANGLE_MARGIN:
                 return
             # Turning
             self.turn_robot(rot)
@@ -179,8 +182,8 @@ class ControlNode(Node):
         
         # calc angle
         dist, angle, _ = self.get_relative_dist(self.lat, cur_lat, self.long, cur_long)
-        print('dist', dist, 'angle', angle)
         if dist >= DIST_MIN:
+            print('Adjust - dist', dist, 'adjusted angle', angle)
             self.angle = angle
             self.lat = cur_lat
             self.long = cur_long
@@ -191,14 +194,14 @@ class ControlNode(Node):
             elif (rot < -180):
                 rot = rot + 360
                     
-            if abs(rot) < ANGLE_MARGIN:
+            if abs(rot) <= ANGLE_MARGIN:
                 return
             # Turning
             self.turn_robot(rot)
             return
         
-        # 250mm/s 
-        control_msg = self.convert_msg(0.5, 0.0)
+        # 500mm/s 
+        control_msg = self.convert_msg(1.0, 0.0)
         self.robot_pub.publish(control_msg)
 
     def turn_robot(self, angle):
@@ -217,7 +220,7 @@ class ControlNode(Node):
         y_difference = lat2 - lat1
         x_difference = long2 - long1
         y_distance = math.radians(y_difference) * R_KM * 1000
-        x_distance = math.radians(x_difference) * R_KM * math.cos(self.lat) * 1000
+        x_distance = math.radians(x_difference) * R_KM * math.cos(lat1) * 1000
         
         angle = math.atan2(y_distance, x_distance)
         angle = math.degrees(angle)
@@ -245,6 +248,7 @@ class ControlNode(Node):
         # and stop the robot if there is one
         if (self.drive_mode == DRIVE_MODE.AUTO and self.trigger):
             min_range,_ = self.lidar.get_min_range()
+
             if (min_range < LIDAR_STOP_DISTANCE):
                 print('Obstacle detected')
                 control_msg = self.convert_msg(0.0, 0.0)
@@ -264,23 +268,35 @@ class ControlNode(Node):
             print('Button 3')
             self.angle = 0
             self.angle_counter = -1
+            self.long = 0
+            self.lat = 0
             
             
         elif (msg.buttons[4]):
             print('Button 4')
+        elif (msg.buttons[5]):
+            print('Button 5')
+        elif (msg.buttons[6]):
+            print('Button 6')
+        elif (msg.buttons[7]):
+            print('Button 7')
         elif (msg.buttons[11]):
-            print('Button 11 - up')
-            control_msg = self.convert_msg(0.5, 0.0)
+            print('Button 11 - up - trigger', self.trigger)
+            control_msg = self.convert_msg(1.0, 0.0)
+            self.robot_pub.publish(control_msg)
+        elif (msg.buttons[12]):
+            print('Button 12 - down - trigger', self.trigger)
+            control_msg = self.convert_msg(-1.0, 0.0)
             self.robot_pub.publish(control_msg)
         elif (msg.buttons[13]):
             if (self.angle_counter >= 0):
                 return
-            print('Button 13 - LEFT')
+            print('Button 13 - LEFT- trigger', self.trigger)
             self.turn_robot(10)
         elif (msg.buttons[14]):
             if (self.angle_counter >= 0):
                 return
-            print('Button 14 - RIGHT')
+            print('Button 14 - RIGHT- trigger', self.trigger)
             self.turn_robot(-10)
 
         if (msg.axes[5] < 0):
@@ -303,9 +319,15 @@ class ControlNode(Node):
         
         # update current angle
         if (self.turning_angle < 0):
-            self.angle = self.angle - self.angle_counter
+            if (self.angle <= -179):
+                self.angle = 180
+            else:
+                self.angle = self.angle - 1 #self.angle_counter
         else:
-            self.angle = self.angle + self.angle_counter
+            if (self.angle >= 180):
+                self.angle = -179
+            else:
+                self.angle = self.angle + 1 #self.angle_counter
         
         if (self.angle_counter >= abs(self.turning_angle)):
             # stop
@@ -313,7 +335,7 @@ class ControlNode(Node):
             self.robot_pub.publish(control_msg)
             self.turning_angle = 0
             self.angle_counter = -1
-            print('Turn Finish')
+            print('Turn Finish - current angle: ', self.angle)
             return
         
         self.angle_counter += 1
