@@ -16,7 +16,11 @@ class CameraViewer(Node):
         self.live_mode = True  # Track whether live mode is active
         
         # Image Directory
-        self.image_dir = "/home/team10/AUTO4508/detected_images"
+        self.image_dir = "/home/team10/AUTO4508/center_detected_images"
+        if not os.path.exists(self.image_dir):
+            os.makedirs(self.image_dir)  # Create the directory if it doesn't exist
+            self.get_logger().info(f"Directory '{self.image_dir}' created.")
+
         self.image_files = sorted([f for f in os.listdir(self.image_dir) if f.endswith((".jpg", ".png", ".jpeg"))])
         self.image_index = 0  # Track which image is displayed
 
