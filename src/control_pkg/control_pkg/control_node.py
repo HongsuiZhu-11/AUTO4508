@@ -17,8 +17,8 @@ import math
 
 WAY_POINTS = [(-31.980327, 115.817317), (-31.980554, 115.817743), (-31.980368, 115.818476)]
 
-DIST_MIN = 10
-DEST_MARGIN = 3
+DIST_MIN = 100000
+DEST_MARGIN = 5
 ANGLE_MARGIN = 5
 
 # Lidar has some 0 reads and detects it's back plate, threshold in meters for minimum acceptable readings
