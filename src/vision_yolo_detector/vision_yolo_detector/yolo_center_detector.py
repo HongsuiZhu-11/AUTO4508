@@ -17,6 +17,7 @@ CLASS_COLORS = {
 }
 
 TARGET_CLASSES = set(CLASS_COLORS.keys())
+EXTRA_CLASSES = {'bucket-red', 'cone-yellow-green'}
 
 class YoloCenterDetector(Node):
     def __init__(self):
@@ -29,14 +30,13 @@ class YoloCenterDetector(Node):
         self.model = YOLO(model_path)
 
         os.makedirs("center_detected_images", exist_ok=True)
-        self.processed_once = False
-        self.get_logger().info("🚀 YOLO center-focused detector started and waiting for image...")
+
+        self.detected_cone = False
+        self.detected_extra = False
+
+        self.get_logger().info("🚀 Dual-target YOLO center detector running.")
 
     def image_callback(self, msg):
-        if self.processed_once:
-            return
-        self.processed_once = True
-
         frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         results = self.model(frame)[0]
 
@@ -64,26 +64,31 @@ class YoloCenterDetector(Node):
                 closest_box = (x1, y1, x2, y2)
 
         annotated = frame.copy()
+
         if closest_label:
             x1, y1, x2, y2 = closest_box
             color = CLASS_COLORS[closest_label]
-            obj_cx = (x1 + x2) // 2
-            obj_cy = (y1 + y2) // 2
-            offset_x = obj_cx - center_x  # 正数表示偏右，负数表示偏左
-
             cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
             cv2.putText(annotated, f"{closest_label}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-            filename = f"center_detected_images/{closest_label}_{datetime.now().strftime('%H%M%S')}.jpg"
-            cv2.imwrite(filename, annotated)
 
-            message = f"{closest_label}, offset={offset_x}"
-            self.publisher_.publish(String(data=message))
-            self.get_logger().info(f"✅ Detected and published: {message} → Saved: {filename}")
+            self.publisher_.publish(String(data=closest_label))
+            self.get_logger().info(f"📢 Published: {closest_label}")
+
+            if closest_dist < 50:
+                if closest_label == 'cone-orange' and not self.detected_cone:
+                    self._save_image(annotated, closest_label)
+                    self.detected_cone = True
+                elif closest_label in EXTRA_CLASSES and not self.detected_extra:
+                    self._save_image(annotated, closest_label)
+                    self.detected_extra = True
         else:
             self.publisher_.publish(String(data="No-target"))
-            self.get_logger().info("❌ No valid target detected at center.")
+            self.get_logger().info("❌ No valid target detected.")
 
-        # 🚫 不再调用 rclpy.shutdown()，让节点保持运行
+    def _save_image(self, image, label):
+        filename = f"center_detected_images/{label}_{datetime.now().strftime('%H%M%S')}.jpg"
+        cv2.imwrite(filename, image)
+        self.get_logger().info(f"📸 Saved: {filename}")
 
 def main(args=None):
     rclpy.init(args=args)
