@@ -303,7 +303,7 @@ class ControlNode(Node):
             return
         
         # update current angle
-        if (self.angle < 0):
+        if (self.turning_angle < 0):
             if (self.angle <= -179):
                 self.angle = 180
             else:
