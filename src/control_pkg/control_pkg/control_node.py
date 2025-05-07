@@ -69,7 +69,17 @@ class LidarScan:
     def get_min_range(self):
         if not self.ranges:
             return -1.0
-        return min((r for r in self.ranges if r > MIN_LIDAR_MARGIN), default=-1.0)
+        items = len(self.ranges)
+        cur_min = -1
+        cur_min_index = 0
+        for i in range(0, items):
+            if math.isinf(self.ranges[i]) or math.isnan(self.ranges[i]):
+                self.ranges[i] = -1.0
+            if self.ranges[i] < cur_min:
+                cur_min = self.ranges[i]
+                cur_min_index = i
+        return cur_min, cur_min_index
+
 
 
 class ControlNode(Node): 
@@ -237,7 +247,8 @@ class ControlNode(Node):
         # Given the lidar data, check if there is an obstacle in front of the robot
         # and stop the robot if there is one
         if (self.drive_mode == DRIVE_MODE.AUTO and self.trigger):
-            min_range = self.lidar.get_min_range()
+            min_range,_ = self.lidar.get_min_range()
+
             if (min_range < LIDAR_STOP_DISTANCE):
                 print('Obstacle detected')
                 control_msg = self.convert_msg(0.0, 0.0)
