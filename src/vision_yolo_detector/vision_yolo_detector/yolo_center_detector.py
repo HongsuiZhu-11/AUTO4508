@@ -33,6 +33,10 @@ class YoloCenterDetector(Node):
         self.get_logger().info("🚀 YOLO center-focused detector started and waiting for image...")
 
     def image_callback(self, msg):
+        if self.processed_once:
+            return
+        self.processed_once = True
+
         frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         results = self.model(frame)[0]
 
@@ -63,22 +67,26 @@ class YoloCenterDetector(Node):
         if closest_label:
             x1, y1, x2, y2 = closest_box
             color = CLASS_COLORS[closest_label]
+            obj_cx = (x1 + x2) // 2
+            horizontal_offset = obj_cx - center_x  # <--- 新增：计算偏移量
+
+            # 可视化
             cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
-            cv2.putText(annotated, f"{closest_label}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+            cv2.putText(annotated, f"{closest_label} ({horizontal_offset})", (x1, y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
-            message = f"{closest_label}, offset=({(x1 + x2)//2 - center_x}, {(y1 + y2)//2 - center_y})"
-            self.publisher_.publish(String(data=message))
-            self.get_logger().info(f"📢 Published: {message}")
+            filename = f"center_detected_images/{closest_label}_{datetime.now().strftime('%H%M%S')}.jpg"
+            cv2.imwrite(filename, annotated)
 
-            # 仅当目标靠近中心时才保存图像（如距离小于 50 像素）
-            if closest_dist < 50:
-                filename = f"center_detected_images/{closest_label}_{datetime.now().strftime('%H%M%S')}.jpg"
-                cv2.imwrite(filename, annotated)
-                self.get_logger().info(f"📸 Image saved: {filename}")
+            # 修改发布内容为 label:offset
+            self.publisher_.publish(String(data=f"{closest_label}:{horizontal_offset}"))
+            self.get_logger().info(f"✅ Detected: {closest_label}, Offset: {horizontal_offset}px → Saved: {filename}")
+
         else:
             self.publisher_.publish(String(data="No-target"))
-            self.get_logger().info("❌ No valid target detected.")
+            self.get_logger().info("❌ No valid target detected at center.")
 
+        # 🚫 不再调用 rclpy.shutdown()，让节点保持运行
 
 def main(args=None):
     rclpy.init(args=args)
