@@ -273,6 +273,10 @@ class ControlNode(Node):
             print('Button 11 - up - trigger', self.trigger)
             control_msg = self.convert_msg(1.0, 0.0)
             self.robot_pub.publish(control_msg)
+        elif (msg.buttons[12]):
+            print('Button 12 - down - trigger', self.trigger)
+            control_msg = self.convert_msg(-1.0, 0.0)
+            self.robot_pub.publish(control_msg)
         elif (msg.buttons[13]):
             if (self.angle_counter >= 0):
                 return
