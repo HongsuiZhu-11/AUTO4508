@@ -95,6 +95,7 @@ class ControlNode(Node):
         self.create_subscription(Joy, "joy", self.joy_cb, 10)
         self.create_subscription(Twist, "cmd_vel", self.twist_cb, 10)
         self.create_subscription(LaserScan, "scan", self.lidar_cb, 10)
+        self.create_subscription(String, "target_detected", self.image_cb, 10)
         
         # Publisher
         self.robot_pub = self.create_publisher(Twist, 'cmd_vel_team10', 10)
@@ -122,10 +123,37 @@ class ControlNode(Node):
         
         self.angle_counter = -1
         self.turning_angle = 0
+        self.first_turning = False
         
         self.lidar = LidarScan()
         
-                
+    def image_cb(self, msg):
+        image_margin = 30
+        detected = msg.data
+        if ('cone-orange' in detected):
+            offset = detected.split(',')[1]
+            offset = offset[len('offset=')+1:]
+            offset = int(offset)
+            if (self.first_turning):
+                if offset < -image_margin:
+                    # turn right
+                    self.turn_robot(-45)
+                elif offset > image_margin:
+                    # turn left
+                    self.turn_robot(45)
+                else:
+                    control_msg = self.convert_msg(0.0, 0.0)
+                    self.robot_pub.publish(control_msg)
+                    self.angle_counter = -1
+                    self.first_turning = False
+            
+        elif ('bucket-red' in detected or  'cone-yellow-green'in detected):
+            offset = detected.split(',')[1]
+            offset = offset[len('offset=')+1:]
+            offset = int(offset)
+            
+            
+    
     def gps_callback(self, msg):
         #print(msg)
         cur_lat = msg.latitude
@@ -146,6 +174,10 @@ class ControlNode(Node):
         if self.angle_counter >=0:
             # on Turning
             #print("on Turning", self_counter)
+            return
+        
+        if self.first_turning:
+            # on Turning
             return
         
         if self.lat == 0 or self.long == 0:
@@ -171,17 +203,20 @@ class ControlNode(Node):
             #       read Lidar at 0 (forward)
             #       
 
-            # self.following_mode = FOWLLOW_MODE.FINDING
+            self.following_mode = FOWLLOW_MODE.FINDING
             self.current_point += 1
+            self.turn_robot(1000)
             return
              
         if not self.is_start and self.following_mode != FOWLLOW_MODE.FINDING:
             self.is_start = True
             self.following_mode = FOWLLOW_MODE.FOLLOWING
-            if abs(rot) <= ANGLE_MARGIN:
-                return
-            # Turning
-            self.turn_robot(rot)
+            # if abs(rot) <= ANGLE_MARGIN:
+            #     return
+            # # Turning
+            # self.turn_robot(rot)
+            self.turn_robot(1000)
+            self.first_turning = True
             return
         
         
@@ -275,6 +310,14 @@ class ControlNode(Node):
             self.angle_counter = -1
             self.long = 0
             self.lat = 0
+            self.following_mode = FOWLLOW_MODE.FOLLOWING
+            # if abs(rot) <= ANGLE_MARGIN:
+            #     return
+            # # Turning
+            # self.turn_robot(rot)
+            self.turn_robot(1000)
+            self.first_turning = True
+            
             
             
         elif (msg.buttons[4]):
