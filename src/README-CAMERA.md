@@ -18,7 +18,7 @@ Publishes image frames from an OAK-D stereo camera to a ROS2 topic.
 **Run:**
 
 ```bash
-ros2 run vision_oak_publisher oak_camera_node
+ros2 run vision_oak_publisher oak_camera_publisher
 ```
 
 This node continuously streams images from the OAK-D device.
