@@ -119,15 +119,12 @@ class ControlNode(Node):
         
         if (type(cur_lat) == str or math.isnan(cur_lat) or int(cur_lat) != -31):
             return
-        if self.lat == 0 or self.long == 0:
-            print('set current gps')
-            self.lat = cur_lat
-            self.long = cur_long
-            return
+
 
         if self.drive_mode != DRIVE_MODE.AUTO:
             #print('not Driving', self.drive_mode)
             return
+        
         if not self.trigger:
             #print('not trigger', self.trigger)
             return
@@ -135,6 +132,12 @@ class ControlNode(Node):
         if self.angle_counter >=0:
             # on Turning
             #print("on Turning", self_counter)
+            return
+        
+        if self.lat == 0 or self.long == 0:
+            print('set current gps')
+            self.lat = cur_lat
+            self.long = cur_long
             return
         
         target_lat = WAY_POINTS[self.current_point][0]
@@ -254,23 +257,31 @@ class ControlNode(Node):
             print('Button 3')
             self.angle = 0
             self.angle_counter = -1
+            self.long = 0
+            self.lat = 0
             
             
         elif (msg.buttons[4]):
             print('Button 4')
+        elif (msg.buttons[5]):
+            print('Button 5')
+        elif (msg.buttons[6]):
+            print('Button 6')
+        elif (msg.buttons[7]):
+            print('Button 7')
         elif (msg.buttons[11]):
-            print('Button 11 - up')
-            control_msg = self.convert_msg(0.5, 0.0)
+            print('Button 11 - up - trigger', self.trigger)
+            control_msg = self.convert_msg(1.0, 0.0)
             self.robot_pub.publish(control_msg)
         elif (msg.buttons[13]):
             if (self.angle_counter >= 0):
                 return
-            print('Button 13 - LEFT')
+            print('Button 13 - LEFT- trigger', self.trigger)
             self.turn_robot(10)
         elif (msg.buttons[14]):
             if (self.angle_counter >= 0):
                 return
-            print('Button 14 - RIGHT')
+            print('Button 14 - RIGHT- trigger', self.trigger)
             self.turn_robot(-10)
 
         if (msg.axes[5] < 0):
