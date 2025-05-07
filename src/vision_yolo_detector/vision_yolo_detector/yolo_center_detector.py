@@ -67,12 +67,18 @@ class YoloCenterDetector(Node):
         if closest_label:
             x1, y1, x2, y2 = closest_box
             color = CLASS_COLORS[closest_label]
+            obj_cx = (x1 + x2) // 2
+            obj_cy = (y1 + y2) // 2
+            offset_x = obj_cx - center_x  # 正数表示偏右，负数表示偏左
+
             cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
             cv2.putText(annotated, f"{closest_label}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
             filename = f"center_detected_images/{closest_label}_{datetime.now().strftime('%H%M%S')}.jpg"
             cv2.imwrite(filename, annotated)
-            self.publisher_.publish(String(data=closest_label))
-            self.get_logger().info(f"✅ Detected and published: {closest_label} → Saved: {filename}")
+
+            message = f"{closest_label}, offset={offset_x}"
+            self.publisher_.publish(String(data=message))
+            self.get_logger().info(f"✅ Detected and published: {message} → Saved: {filename}")
         else:
             self.publisher_.publish(String(data="No-target"))
             self.get_logger().info("❌ No valid target detected at center.")
