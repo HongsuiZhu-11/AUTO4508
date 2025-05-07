@@ -147,8 +147,8 @@ class ControlNode(Node):
         target_long = WAY_POINTS[self.current_point][1]
         tart_dist, target_angle, rot = self.get_relative_dist(
             cur_lat, target_lat, cur_long, target_long)
-        print('dist', tart_dist, 'angle', target_angle,
-              'cur_angle', self.angle, 'rot', rot)
+        #print('dist', tart_dist, 'angle', target_angle,
+        #      'cur_angle', self.angle, 'rot', rot)
         # check goal
         if tart_dist <= DEST_MARGIN:
             print('Arrive: ', self.current_point)
@@ -178,7 +178,7 @@ class ControlNode(Node):
         dist, angle, _ = self.get_relative_dist(
             self.lat, cur_lat, self.long, cur_long)
         if dist >= DIST_MIN:
-            print('Adjust - dist', dist, 'adjusted angle', angle)
+            #print('Adjust - dist', dist, 'adjusted angle', angle)
             self.angle = angle
             self.lat = cur_lat
             self.long = cur_long
@@ -293,17 +293,17 @@ class ControlNode(Node):
         elif (msg.buttons[7]):
             print('Button 7')
         elif (msg.buttons[11]):
-            print('Button 11 - up - trigger', self.trigger)
+            #print('Button 11 - up - trigger', self.trigger)
             control_msg = self.convert_msg(1.0, 0.0)
             self.robot_pub.publish(control_msg)
         elif (msg.buttons[12]):
-            print('Button 12 - down - trigger', self.trigger)
+            #print('Button 12 - down - trigger', self.trigger)
             control_msg = self.convert_msg(-1.0, 0.0)
             self.robot_pub.publish(control_msg)
         elif (msg.buttons[13]):
             if (self.angle_counter >= 0):
                 return
-            print('Button 13 - LEFT- trigger', self.trigger)
+            #print('Button 13 - LEFT- trigger', self.trigger)
             self.turn_robot(10)
         elif (msg.buttons[14]):
             if (self.angle_counter >= 0):
@@ -344,6 +344,7 @@ class ControlNode(Node):
         if (self.angle_counter >= abs(self.turning_angle)):
             # stop
             control_msg = self.convert_msg(0.0, 0.0)
+            print("Angle counter: ", self.angle_counter)
             self.robot_pub.publish(control_msg)
             self.turning_angle = 0
             self.angle_counter = -1
