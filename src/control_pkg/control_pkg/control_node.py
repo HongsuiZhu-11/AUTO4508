@@ -129,34 +129,27 @@ class ControlNode(Node):
     def gps_callback(self, msg):
         curr_lat = msg.latitude
         curr_long = msg.longitude
-        #print(f"{curr_lat}, {curr_long}")
+        # print(f"{curr_lat}, {curr_long}")
+
+        if self.lat == 0 or self.long == 0:
+            print('set current gps')
+            self.lat = curr_lat
+            self.long = curr_long
+            return
 
         if self.drive_mode == DRIVE_MODE.AUTO:
             print("Control: in auto mode")
+
+        target_lat = WAY_POINTS[self.current_point][0]
+        target_long = WAY_POINTS[self.current_point][1]
+        tart_dist, target_angle, rot = self.get_relative_dist(
+            curr_lat, target_lat, curr_long, target_long)
+        print(f"Dist:{tart_dist}, angle:{target_angle}, curr_angle:{self.angle}, rot:{rot}")
+        
         control_msg = self.convert_msg(1.0, 1.0)
-        #self.robot_pub.publish(control_msg)
+        # self.robot_pub.publish(control_msg)
 
-    """ def gps_callback(self, msg):
-        # print(msg)
-        cur_lat = msg.latitude
-        cur_long = msg.longitude
-
-        if (type(cur_lat) == str or math.isnan(cur_lat) or int(cur_lat) != -31):
-            return
-
-        if self.drive_mode != DRIVE_MODE.AUTO:
-            # print('not Driving', self.drive_mode)
-            return
-
-        if not self.trigger:
-            # print('not trigger', self.trigger)
-            return
-
-        if self.angle_counter >= 0:
-            # on Turning
-            # print("on Turning", self_counter)
-            return
-
+    """
         if self.lat == 0 or self.long == 0:
             print('set current gps')
             self.lat = cur_lat
@@ -219,6 +212,7 @@ class ControlNode(Node):
         control_msg = self.convert_msg(1.0, 0.0)
         self.robot_pub.publish(control_msg)
  """
+
     def turn_robot(self, angle):
         self.turning_angle = angle
         self.angle_counter = 0
@@ -313,23 +307,23 @@ class ControlNode(Node):
         elif (msg.buttons[7]):
             print('Button 7')
         elif (msg.buttons[11]):
-            #print('Button 11 - up - trigger', self.trigger)
+            # print('Button 11 - up - trigger', self.trigger)
             control_msg = self.convert_msg(1.0, 0.0)
-            #self.robot_pub.publish(control_msg)
+            # self.robot_pub.publish(control_msg)
         elif (msg.buttons[12]):
-            #print('Button 12 - down - trigger', self.trigger)
+            # print('Button 12 - down - trigger', self.trigger)
             control_msg = self.convert_msg(-1.0, 0.0)
-            #self.robot_pub.publish(control_msg)
+            # self.robot_pub.publish(control_msg)
         elif (msg.buttons[13]):
             if (self.angle_counter >= 0):
                 return
-            #print('Button 13 - LEFT- trigger', self.trigger)
+            # print('Button 13 - LEFT- trigger', self.trigger)
             self.turn_robot(10)
         elif (msg.buttons[14]):
             if (self.angle_counter >= 0):
                 return
             print('Button 14 - RIGHT- trigger', self.trigger)
-            #self.turn_robot(-10)
+            # self.turn_robot(-10)
 
         if (msg.axes[5] < 0):
             self.trigger = True
@@ -338,7 +332,7 @@ class ControlNode(Node):
             self.is_start = False
             if (self.linear != 0.0 or self.angualr != 0.0):
                 control_msg = self.convert_msg(0.0, 0.0)
-                #self.robot_pub.publish(control_msg)
+                # self.robot_pub.publish(control_msg)
             self.angle_counter = -1
 
     def twist_cb(self, msg):
@@ -380,6 +374,7 @@ class ControlNode(Node):
         else:
             heartbeat_msg.data = 0
         self.heartbeat_pub.publish(heartbeat_msg)
+
 
 def main(args=None):
     rclpy.init(args=args)
