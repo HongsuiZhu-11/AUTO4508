@@ -82,6 +82,7 @@ class ControlNode(Node):
 
         # Subscribers
         self.create_subscription(NavSatFix, "fix", self.gps_callback, 10)
+        self.create_subscription(Joy, "joy", self.joy_cb, 10)
         """ self.create_subscription(NavSatFix, "fix", self.gps_callback, 10)
         self.create_subscription(Joy, "joy", self.joy_cb, 10)
         self.create_subscription(Twist, "cmd_vel", self.twist_cb, 10)
@@ -126,7 +127,11 @@ class ControlNode(Node):
         return msg
 
     def gps_callback(self, msg):
-        print(f"{msg.latitude}, {msg.longitude}")
+        curr_lat = msg.latitude
+        curr_long = msg.longitude
+        print(f"{curr_lat}, {curr_long}")
+
+
 
         control_msg = self.convert_msg(1.0, 1.0)
         self.robot_pub.publish(control_msg)
