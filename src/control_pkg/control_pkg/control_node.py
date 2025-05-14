@@ -86,7 +86,6 @@ class ControlNode(Node):
         self.create_subscription(Joy, "joy", self.joy_cb, 10)
         self.create_subscription(Twist, "cmd_vel", self.twist_cb, 10)
         self.create_subscription(LaserScan, "scan", self.lidar_cb, 10) """
-        self.create_subscription(LaserScan, "scan", self.lidar_cb, 10) """
 
         # Publisher
         self.robot_pub = self.create_publisher(Twist, 'cmd_vel_team10', 10)
