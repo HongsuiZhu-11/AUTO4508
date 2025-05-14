@@ -5,7 +5,7 @@ from rclpy.node import Node
 from std_msgs.msg import String, Float32, Int32
 
 # Path to your virtual environment
-venv_path = "/home/shawn/ws/AUTO4508/venv"
+venv_path = "/home/team10/ws/AUTO4508/venv"
 
 # Manually set environment variables to activate the venv
 os.environ["VIRTUAL_ENV"] = venv_path
@@ -24,8 +24,23 @@ class ImuNode(Node):
         super().__init__("IMU_Node")
         self.spatial = Spatial()
         self.create_timer(0.25, self.timer_cb)
+        self.spatial_counter = 0
         
     def timer_cb(self):
+        if (self.spatial_counter < 0):
+            return
+        
+        if (self.spatial_counter > 20): # wait 5s
+            print('error open to spatial')
+            self.spatial_counter = -1
+            return
+        
+        if (not self.spatial.getIsOpen()):
+            self.spatial_counter += 1
+            return
+        
+        self.spatial_counter = 0
+        
         angles = self.spatial.getEulerAngles()
         print('pitch:', angles.pitch, 'roll:', angles.roll, 'heading:', angles.heading)
         
