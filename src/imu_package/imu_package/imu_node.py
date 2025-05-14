@@ -12,7 +12,7 @@ os.environ["VIRTUAL_ENV"] = venv_path
 os.environ["PATH"] = f"{venv_path}/bin:" + os.environ["PATH"]
 
 # Add the virtual environment's site-packages to sys.path
-site_packages = os.path.join(venv_path, "lib", "python3.11", "site-packages")  # Adjust Python version
+site_packages = os.path.join(venv_path, "lib", "python3.12", "site-packages")  # Adjust Python version
 sys.path.insert(0, site_packages)
 # import files
 from Phidget22.Devices.Spatial import *
