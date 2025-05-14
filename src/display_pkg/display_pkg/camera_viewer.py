@@ -28,7 +28,8 @@ class CameraViewer(Node):
         self.image_files = sorted([f for f in os.listdir(self.image_dir) if f.endswith((".jpg", ".png", ".jpeg"))])
         self.image_index = 0  # Track which image is displayed
 
-        self.build_ui()  # Build the UI layout
+        self.build_base_ui()  # Build the base UI layout
+        self.update_ui()  # Build the UI layout
 
     def build_base_ui(self):
         """ Build the Tkinter UI layout """
@@ -90,6 +91,10 @@ class CameraViewer(Node):
     def update_ui(self):
         """ Update the UI based on the current mode """
         # Build consistent base UI
+        for widget in self.button_center_frame.grid_slaves():
+            widget.grid_forget()
+        for widget in self.content_frame.grid_slaves():
+            widget.grid_forget()
         self.build_base_ui()  # Rebuild the base UI
         
         # Clear Variable content
