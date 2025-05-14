@@ -16,7 +16,11 @@ services:
     # command: ros2 launch master lowlevel.launch.py params_file:=/lowlevel_config
     # configs:
     # - lowlevel_config 
+    environment:
+    - DISPLAY=${DISPLAY}
+    - QT_X11_NO_MITSHM=1
     volumes:
+    - /tmp/.X11-unix:/tmp/.X11-unix
     # - type: bind
     #   source: /dev/shm
     #   target: /dev/shm
