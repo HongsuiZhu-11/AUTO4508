@@ -132,10 +132,9 @@ class ControlNode(Node):
         # print(f"{curr_lat}, {curr_long}")
 
         if self.lat == 0 or self.long == 0:
-            print('set current gps')
+            #print('set current gps')
             self.lat = curr_lat
             self.long = curr_long
-            return
 
         if self.drive_mode == DRIVE_MODE.AUTO:
             print("Control: in auto mode")
