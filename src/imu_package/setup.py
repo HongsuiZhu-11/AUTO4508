@@ -20,6 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'imu_node = imu_package.imu_node:main',
         ],
     },
 )
