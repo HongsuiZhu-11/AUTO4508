@@ -129,12 +129,12 @@ class ControlNode(Node):
     def gps_callback(self, msg):
         curr_lat = msg.latitude
         curr_long = msg.longitude
-        print(f"{curr_lat}, {curr_long}")
+        #print(f"{curr_lat}, {curr_long}")
 
-
-
+        if self.drive_mode == DRIVE_MODE.AUTO:
+            print("Control: in auto mode")
         control_msg = self.convert_msg(1.0, 1.0)
-        self.robot_pub.publish(control_msg)
+        #self.robot_pub.publish(control_msg)
 
     """ def gps_callback(self, msg):
         # print(msg)
