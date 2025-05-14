@@ -24,7 +24,7 @@ find_package(rosidl_default_generators REQUIRED)
 
 find_package(sick_scan_xd REQUIRED)
 
-add_executable(lidar_test02 src/lidar_test02.cpp)
+add_executable(lidar_test02 src/lidar_test02_v2.cpp)
 
 ament_target_dependencies(
         lidar_test02
