@@ -10,8 +10,14 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(rclcpp_components REQUIRED)
+find_package(example_interfaces REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(std_msgs REQUIRED)
 
-include_directories(include)
+include_directories(
+  include
+  ${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -25,11 +31,24 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-add_executable(ariaNode src/ariaNode_v1.cpp)
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "srv/DriveDistance.srv"
+  "srv/TurnAngle.srv"
+  DEPENDENCIES example_interfaces std_msgs
+)
+
+add_executable(ariaNode src/ariaNode.cpp)
 ament_target_dependencies(ariaNode
 "rclcpp"
 "sensor_msgs"
 "rclcpp_components"
+"example_interfaces"
+"std_msgs"
+"rosidl_default_runtime"
+)
+
+target_include_directories(ariaNode PRIVATE
+  ${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp
 )
 
 target_link_libraries(
@@ -37,8 +56,18 @@ target_link_libraries(
   libAria.so
 )
 
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+add_dependencies(ariaNode ${cpp_typesupport_target})
+
 install(TARGETS
 ariaNode
 DESTINATION lib/${PROJECT_NAME})
+
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  set(ament_cmake_cpplint_FOUND TRUE)
+  set(ament_cmake_copyright_FOUND TRUE)
+  ament_lint_auto_find_test_dependencies()
+endif()
 
 ament_package()
