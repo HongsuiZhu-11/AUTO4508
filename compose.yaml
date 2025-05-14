@@ -17,7 +17,7 @@ services:
     # configs:
     # - lowlevel_config 
     environment:
-    - DISPLAY=${DISPLAY}
+    - DISPLAY=:1
     - QT_X11_NO_MITSHM=1
     volumes:
     - /tmp/.X11-unix:/tmp/.X11-unix
@@ -34,13 +34,13 @@ services:
       source: /home/team10
       target: /home/team10
     #command: ros2 run joy joy_node 
-    #command: ros2 launch teleop_twist_joy teleop-launch.py
-    command: >
-      bash -c "
-        sleep 5;
-        ros2 param set /teleop_twist_joy/require_enable_button false &&
-        ros2 launch teleop_twist_joy teleop-launch.py
-      "
+    command: ros2 launch teleop_twist_joy teleop-launch.py
+    # command: >
+    #   bash -c "
+    #     sleep 5;
+    #     ros2 param set /teleop_twist_joy/require_enable_button false &&
+    #     ros2 launch teleop_twist_joy teleop-launch.py
+    #   "
 
     device_cgroup_rules: #alternative to devices
       - 'c 4:63 rmw'
