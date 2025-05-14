@@ -1,6 +1,6 @@
 #include "ariaNode.hpp"
-#include "example_interfaces/srv/float64.hpp" // For distance and angle parameters
-#include "example_interfaces/srv/trigger.hpp" // For simple start/stop services
+#include "example_interfaces/msg/float64.hpp" // For distance and angle parameters
+#include "example_interfaces/msg/trigger.hpp" // For simple start/stop services
 #include "geometry_msgs/msg/twist.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/int32.hpp"
