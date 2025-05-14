@@ -10,80 +10,85 @@ import os
 from datetime import datetime
 import pkg_resources
 
-CLASS_COLORS = {
-    'cone-orange': (0, 140, 255),
-    'bucket-red': (0, 0, 255),
-    'cone-yellow-green': (0, 255, 0)
-}
-
-TARGET_CLASSES = set(CLASS_COLORS.keys())
-
 class YoloCenterDetector(Node):
     def __init__(self):
         super().__init__('yolo_center_detector')
         self.bridge = CvBridge()
-        self.subscription = self.create_subscription(Image, '/camera/image_raw', self.image_callback, 10)
+
+        # Subscriptions
+        self.rgb_sub = self.create_subscription(Image, '/camera/image_raw', self.image_callback, 10)
+        self.depth_sub = self.create_subscription(Image, '/camera/depth/image_raw', self.depth_callback, 10)
+
+        # Publishers
         self.publisher_ = self.create_publisher(String, '/target_detected', 10)
+        self.annotated_pub = self.create_publisher(Image, '/target_annotated/image_raw', 10)
 
-        model_path = os.path.join(pkg_resources.resource_filename('vision_yolo_detector', 'model'), 'best.pt')
+        # Load model
+        model_path = os.path.join(pkg_resources.resource_filename('vision_yolo_detector', 'model'), 'best_object.pt')
         self.model = YOLO(model_path)
+        self.all_classes = set(self.model.names.values())  # Detect all classes
 
+        # State
+        self.latest_depth = None
+        self.saved_labels = set()
         os.makedirs("center_detected_images", exist_ok=True)
-        self.processed_once = False
-        self.get_logger().info("🚀 YOLO center-focused detector started and waiting for image...")
+
+        self.get_logger().info("🚀 YOLO detector initialized with automatic class recognition.")
+
+    def get_color_for_class(self, label):
+        # Generate a unique BGR color for each label using HSV hash
+        h = hash(label) % 180
+        hsv_color = np.uint8([[[h, 255, 255]]])
+        bgr_color = cv2.cvtColor(hsv_color, cv2.COLOR_HSV2BGR)[0][0]
+        return tuple(int(c) for c in bgr_color)
+
+    def depth_callback(self, msg):
+        self.latest_depth = self.bridge.imgmsg_to_cv2(msg, desired_encoding="16UC1")
 
     def image_callback(self, msg):
-        if self.processed_once:
-            return
-        self.processed_once = True
-
         frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         results = self.model(frame)[0]
-
         height, width, _ = frame.shape
-        center_x, center_y = width // 2, height // 2
+        center_x = width // 2
 
-        closest_label = None
-        closest_box = None
-        closest_dist = float('inf')
+        detections = []
+        annotated = frame.copy()
 
         for box in results.boxes:
             cls_id = int(box.cls[0])
             label = self.model.names[cls_id]
-            if label not in TARGET_CLASSES:
-                continue
-
             x1, y1, x2, y2 = map(int, box.xyxy[0])
-            obj_cx = (x1 + x2) // 2
-            obj_cy = (y1 + y2) // 2
-            dist = np.hypot(center_x - obj_cx, center_y - obj_cy)
+            cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+            offset = cx - center_x
 
-            if dist < closest_dist:
-                closest_dist = dist
-                closest_label = label
-                closest_box = (x1, y1, x2, y2)
+            # Get depth
+            depth = -1
+            if self.latest_depth is not None and 0 <= cy < self.latest_depth.shape[0] and 0 <= cx < self.latest_depth.shape[1]:
+                depth = int(self.latest_depth[cy, cx])
 
-        annotated = frame.copy()
-        if closest_label:
-            x1, y1, x2, y2 = closest_box
-            color = CLASS_COLORS[closest_label]
-            obj_cx = (x1 + x2) // 2
-            obj_cy = (y1 + y2) // 2
-            offset_x = obj_cx - center_x  # 正数表示偏右，负数表示偏左
+            detections.append(f"{label}, offset={offset}, depth_mm={depth}")
 
+            # Draw annotation
+            color = self.get_color_for_class(label)
             cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
-            cv2.putText(annotated, f"{closest_label}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-            filename = f"center_detected_images/{closest_label}_{datetime.now().strftime('%H%M%S')}.jpg"
-            cv2.imwrite(filename, annotated)
+            cv2.putText(annotated, f"{label}", (x1, y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
-            message = f"{closest_label}, offset={offset_x}"
-            self.publisher_.publish(String(data=message))
-            self.get_logger().info(f"✅ Detected and published: {message} → Saved: {filename}")
-        else:
-            self.publisher_.publish(String(data="No-target"))
-            self.get_logger().info("❌ No valid target detected at center.")
+            # Save one image per label
+            if label not in self.saved_labels:
+                self.saved_labels.add(label)
+                filename = f"center_detected_images/{label}_{datetime.now().strftime('%H%M%S')}.jpg"
+                cv2.imwrite(filename, annotated)
+                self.get_logger().info(f"📸 Saved image for label '{label}': {filename}")
 
-        # 🚫 不再调用 rclpy.shutdown()，让节点保持运行
+        # Publish detection string
+        msg_out = " | ".join(detections) if detections else "No valid target"
+        self.publisher_.publish(String(data=msg_out))
+        self.get_logger().info(f"📢 {msg_out}")
+
+        # Publish annotated image stream
+        annotated_msg = self.bridge.cv2_to_imgmsg(annotated, encoding='bgr8')
+        self.annotated_pub.publish(annotated_msg)
 
 def main(args=None):
     rclpy.init(args=args)
@@ -92,9 +97,8 @@ def main(args=None):
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
-    finally:
-        node.destroy_node()
-        rclpy.shutdown()
+    node.destroy_node()
+    rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

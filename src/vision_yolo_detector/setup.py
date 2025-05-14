@@ -29,6 +29,8 @@ setup(
     entry_points={
         'console_scripts': [
             'detect_node = vision_yolo_detector.yolo_center_detector:main',
+            'digit_node = vision_yolo_detector.digit_detector_node:main',  
         ],
     },
+
 )
