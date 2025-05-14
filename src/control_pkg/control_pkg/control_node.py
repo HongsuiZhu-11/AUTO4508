@@ -315,11 +315,11 @@ class ControlNode(Node):
         elif (msg.buttons[11]):
             #print('Button 11 - up - trigger', self.trigger)
             control_msg = self.convert_msg(1.0, 0.0)
-            self.robot_pub.publish(control_msg)
+            #self.robot_pub.publish(control_msg)
         elif (msg.buttons[12]):
             #print('Button 12 - down - trigger', self.trigger)
             control_msg = self.convert_msg(-1.0, 0.0)
-            self.robot_pub.publish(control_msg)
+            #self.robot_pub.publish(control_msg)
         elif (msg.buttons[13]):
             if (self.angle_counter >= 0):
                 return
@@ -329,7 +329,7 @@ class ControlNode(Node):
             if (self.angle_counter >= 0):
                 return
             print('Button 14 - RIGHT- trigger', self.trigger)
-            self.turn_robot(-10)
+            #self.turn_robot(-10)
 
         if (msg.axes[5] < 0):
             self.trigger = True
@@ -338,7 +338,7 @@ class ControlNode(Node):
             self.is_start = False
             if (self.linear != 0.0 or self.angualr != 0.0):
                 control_msg = self.convert_msg(0.0, 0.0)
-                self.robot_pub.publish(control_msg)
+                #self.robot_pub.publish(control_msg)
             self.angle_counter = -1
 
     def twist_cb(self, msg):
