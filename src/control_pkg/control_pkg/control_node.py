@@ -81,9 +81,11 @@ class ControlNode(Node):
         super().__init__("Control_Node")
 
         # Subscribers
+        self.create_subscription(NavSatFix, "fix", self.gps_callback, 10)
         """ self.create_subscription(NavSatFix, "fix", self.gps_callback, 10)
         self.create_subscription(Joy, "joy", self.joy_cb, 10)
         self.create_subscription(Twist, "cmd_vel", self.twist_cb, 10)
+        self.create_subscription(LaserScan, "scan", self.lidar_cb, 10) """
         self.create_subscription(LaserScan, "scan", self.lidar_cb, 10) """
 
         # Publisher
@@ -116,7 +118,21 @@ class ControlNode(Node):
 
         self.lidar = LidarScan()
 
+    def convert_msg(self, linear: float, angular: float):
+        msg = Twist()
+        msg.linear.x = linear
+        msg.angular.z = angular
+        self.linear = linear
+        self.angualr = angular
+        return msg
+
     def gps_callback(self, msg):
+        print(f"{msg.latitude}, {msg.longitude}")
+
+        control_msg = self.convert_msg(1.0, 1.0)
+        self.robot_pub.publish(control_msg)
+
+    """ def gps_callback(self, msg):
         # print(msg)
         cur_lat = msg.latitude
         cur_long = msg.longitude
@@ -198,7 +214,7 @@ class ControlNode(Node):
         # 500mm/s
         control_msg = self.convert_msg(1.0, 0.0)
         self.robot_pub.publish(control_msg)
-
+ """
     def turn_robot(self, angle):
         self.turning_angle = angle
         self.angle_counter = 0
@@ -360,15 +376,6 @@ class ControlNode(Node):
         else:
             heartbeat_msg.data = 0
         self.heartbeat_pub.publish(heartbeat_msg)
-
-    def convert_msg(self, linear: float, angular: float):
-        msg = Twist()
-        msg.linear.x = linear
-        msg.angular.z = angular
-        self.linear = linear
-        self.angualr = angular
-        return msg
-
 
 def main(args=None):
     rclpy.init(args=args)
