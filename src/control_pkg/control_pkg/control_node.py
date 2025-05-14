@@ -11,6 +11,8 @@ from sensor_msgs.msg import LaserScan
 
 from geometry_msgs.msg import Twist
 
+from example_interfaces.srv import Float64
+
 from enum import Enum
 import math
 
@@ -94,6 +96,10 @@ class ControlNode(Node):
             Int32, 'heartbeat_team10', 10)
         # self.report_pub = self.create_publisher(String, 'report_team10', 10)
 
+        # Service Clients
+        self.drive_client = self.create_client(Float64, 'drive_distance')
+        self.turn_client = self.create_client(Float64, 'turn_angle')
+
         # Timer
         self.create_timer(0.04, self.timer_cb)
         self.create_timer(0.25, self.heartbeat_timer_cb)
@@ -132,87 +138,29 @@ class ControlNode(Node):
         # print(f"{curr_lat}, {curr_long}")
 
         if self.lat == 0 or self.long == 0:
-            #print('set current gps')
+            # print('set current gps')
             self.lat = curr_lat
             self.long = curr_long
+            return
 
         if self.drive_mode == DRIVE_MODE.AUTO:
-            print("Control: in auto mode")
+            # print("Control: in auto mode")
+            target_lat = WAY_POINTS[self.current_point][0]
+            target_long = WAY_POINTS[self.current_point][1]
+            tart_dist, target_angle, rot = self.get_relative_dist(
+                curr_lat, target_lat, curr_long, target_long)
+            """ print(
+                f"Dist:{tart_dist}, angle:{target_angle}, curr_angle:{self.angle}, rot:{rot}") """
 
-        target_lat = WAY_POINTS[self.current_point][0]
-        target_long = WAY_POINTS[self.current_point][1]
-        tart_dist, target_angle, rot = self.get_relative_dist(
-            curr_lat, target_lat, curr_long, target_long)
-        print(f"Dist:{tart_dist}, angle:{target_angle}, curr_angle:{self.angle}, rot:{rot}")
-        
-        control_msg = self.convert_msg(1.0, 1.0)
-        # self.robot_pub.publish(control_msg)
+            self.send_turn_request(float(rot))
+            if tart_dist > DEST_MARGIN:
+                self.send_drive_request(float(tart_dist))
+            elif self.current_point < 3:
+                self.current_point += 1
+            # control_msg = self.convert_msg(1.0, 1.0)
+            # self.robot_pub.publish(control_msg)
 
-    """
-        if self.lat == 0 or self.long == 0:
-            print('set current gps')
-            self.lat = cur_lat
-            self.long = cur_long
-            return
-
-        target_lat = WAY_POINTS[self.current_point][0]
-        target_long = WAY_POINTS[self.current_point][1]
-        tart_dist, target_angle, rot = self.get_relative_dist(
-            cur_lat, target_lat, cur_long, target_long)
-        #print('dist', tart_dist, 'angle', target_angle,
-        #      'cur_angle', self.angle, 'rot', rot)
-        # check goal
-        if tart_dist <= DEST_MARGIN:
-            print('Arrive: ', self.current_point)
-
-            control_msg = self.convert_msg(0.0, 0.0)
-            self.robot_pub.publish(control_msg)
-            self.is_start = False
-            # TODO Find Optical
-            # while Object not not in center of frame
-            #   Turn toward Object
-            #       read Lidar at 0 (forward)
-
-            # self.following_mode = FOWLLOW_MODE.FINDING
-            self.current_point += 1
-            return
-
-        if not self.is_start and self.following_mode != FOWLLOW_MODE.FINDING:
-            self.is_start = True
-            self.following_mode = FOWLLOW_MODE.FOLLOWING
-            if abs(rot) <= ANGLE_MARGIN:
-                return
-            # Turning
-            self.turn_robot(rot)
-            return
-
-        # calc angle
-        dist, angle, _ = self.get_relative_dist(
-            self.lat, cur_lat, self.long, cur_long)
-        if dist >= DIST_MIN:
-            #print('Adjust - dist', dist, 'adjusted angle', angle)
-            self.angle = angle
-            self.lat = cur_lat
-            self.long = cur_long
-
-            rot = int(target_angle - self.angle)
-            if (rot > 180):
-                rot = rot - 360
-            elif (rot < -180):
-                rot = rot + 360
-
-            if abs(rot) <= ANGLE_MARGIN:
-                return
-            # Turning
-            self.turn_robot(rot)
-            return
-
-        # 500mm/s
-        control_msg = self.convert_msg(1.0, 0.0)
-        self.robot_pub.publish(control_msg)
- """
-
-    def turn_robot(self, angle):
+    """ def turn_robot(self, angle):
         self.turning_angle = angle
         self.angle_counter = 0
         if (angle > 0):
@@ -221,7 +169,7 @@ class ControlNode(Node):
             w = -0.5
 
         control_msg = self.convert_msg(0.0, w)
-        self.robot_pub.publish(control_msg)
+        self.robot_pub.publish(control_msg) """
 
     def get_relative_dist(self, lat1, lat2, long1, long2):
         R_KM = 6371.0
@@ -258,7 +206,8 @@ class ControlNode(Node):
         elif (rot < -180):
             rot = rot + 360
 
-        return test_dist, test_angle, rot
+        print(f"Dist:{dist}, Angle:{angle}, Rot:{rot}, test_Dist:{test_dist}, test_Angle:{test_angle}")
+        return dist, test_angle, rot
         # x_distance = x_difference * 111.320 * (math.cos(y_difference * math.pi / 180)) *1000
 
     def lidar_cb(self, msg):
