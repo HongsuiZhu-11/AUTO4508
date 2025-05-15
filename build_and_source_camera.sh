@@ -17,3 +17,9 @@ echo "🎉 Build and environment setup complete."
 # ros2 run vision_yolo_detector detect_node
 # Uncomment the above lines to run the nodes after sourcing
 # Note: Make sure to run this script in a terminal that has the necessary permissions
+
+
+# sudo apt update
+# sudo apt install -y python3-pip
+# pip install --break ultralytics depthai
+# these are the packages that are needed to run the code, you need to run these in terminal before everything
