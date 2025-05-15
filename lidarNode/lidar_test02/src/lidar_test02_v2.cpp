@@ -6,11 +6,11 @@
 #include <thread>
 #include <chrono>
 
-#include <sick_scan_xd/msg/radar_scan.hpp>           // generated in sick_scan_xd by msg-generator
-#include <sick_scan_xd/msg/encoder.hpp>              // generated in sick_scan_xd by msg-generator
-#include <sick_scan_xd/msg/li_doutputstate_msg.hpp>  // generated in sick_scan_xd by msg-generator
-#include <sick_scan_xd/msg/lf_erec_msg.hpp>          // generated in sick_scan_xd by msg-generator
-#include <sick_scan_xd/srv/cola_msg_srv.hpp>         // generated in sick_scan_xd by rosidl-generator
+// #include <sick_scan_xd/msg/radar_scan.hpp>           // generated in sick_scan_xd by msg-generator
+// #include <sick_scan_xd/msg/encoder.hpp>              // generated in sick_scan_xd by msg-generator
+// #include <sick_scan_xd/msg/li_doutputstate_msg.hpp>  // generated in sick_scan_xd by msg-generator
+// #include <sick_scan_xd/msg/lf_erec_msg.hpp>          // generated in sick_scan_xd by msg-generator
+// #include <sick_scan_xd/srv/cola_msg_srv.hpp>         // generated in sick_scan_xd by rosidl-generator
 
 #include <tuple>
 
