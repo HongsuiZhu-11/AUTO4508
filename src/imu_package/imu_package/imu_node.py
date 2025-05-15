@@ -23,6 +23,7 @@ class ImuNode(Node):
     def __init__(self):
         super().__init__("IMU_Node")
         self.spatial = Spatial()
+        self.spatial.open()
         self.create_timer(0.25, self.timer_cb)
         self.spatial_counter = 0
         
