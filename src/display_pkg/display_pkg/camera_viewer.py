@@ -5,6 +5,10 @@ import os
 import tkinter as tk
 from PIL import Image as PilImage, ImageTk
 from sensor_msgs.msg import Image
+# GPS
+from sensor_msgs.msg import NavSatFix
+# Lidar, IMU
+from std_msgs.msg import String, Float32, Int32, Float32MultiArray
 from cv_bridge import CvBridge
 
 MODES = {'live', 'image', 'lidar', 'gps'}  # Define modes for the application
@@ -16,6 +20,12 @@ class CameraViewer(Node):
 
         self.camera_annotated_bridge = CvBridge()
         self.camera_annotated_subscription = self.create_subscription(Image, '/target_annotated/image_raw', self.camera_annotated_callback, 10)
+        # GPS
+        self.gps_sub = self.create_subscription(NavSatFix, "fix", self.gps_cb, 10)
+        # Lidar
+        self.lidar_sub = self.create_subscription(Float32MultiArray, "obstacle_team10", self.obstacle_cb, 10)
+        # IMU
+        self.imu_sub = self.create_subscription(Float32MultiArray, "imu_team10", self.imu_cb, 10)
         
         self.mode = 0  # Track whether live mode is active
         
@@ -170,7 +180,28 @@ class CameraViewer(Node):
         self.live_label.config(image=img_tk)
         self.live_label.image = img_tk  # Prevent garbage collection
 
+    def gps_cb(self, msg):
+        latitude = msg.latitude
+        longitude = msg.longitude
 
+    def obstacle_cb(self, msg):
+        if (len(msg.data) != 3):
+            print('obstacle_cb Massage not matching')
+        if (msg.data[0] == 0.0):
+            obstacle = False
+        else:
+            obstacle = True
+        
+        min_range = msg.data[1]
+        min_angle = msg.data[2]
+    
+    def imu_cb(self, msg):
+        if (len(msg.data) != 3):
+            print('imu_cb Massage not matching')
+        pitch = msg.data[0]
+        roll = msg.data[1]
+        heading = msg.data[2]
+        
     def display_image(self):
         """ Display the current image based on self.image_index """
         if not self.image_files:

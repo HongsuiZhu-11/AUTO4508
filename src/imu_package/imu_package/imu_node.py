@@ -2,10 +2,12 @@ import os
 import sys
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String, Float32, Int32
+from std_msgs.msg import String, Float32, Int32, Float32MultiArray
+#include <std_msgs/msg/float32_multi_array.hpp>
 
 # Path to your virtual environment
 venv_path = "/home/team10/ws/AUTO4508/venv"
+#venv_path = "/home/shawn/ws/AUTO4508/venv"
 
 # Manually set environment variables to activate the venv
 os.environ["VIRTUAL_ENV"] = venv_path
@@ -27,6 +29,8 @@ class ImuNode(Node):
         self.create_timer(0.25, self.timer_cb)
         self.spatial_counter = 0
         
+        self.imu_pub = self.create_publisher(Float32MultiArray, 'imu_team10', 10)
+        
     def timer_cb(self):
         if (self.spatial_counter < 0):
             return
@@ -43,7 +47,10 @@ class ImuNode(Node):
         self.spatial_counter = 0
         
         angles = self.spatial.getEulerAngles()
-        print('pitch:', angles.pitch, 'roll:', angles.roll, 'heading:', angles.heading)
+        angles_msg = Float32MultiArray()
+        angles_msg.data = [angles.pitch, angles.roll, angles.heading]
+        self.imu_pub.publish(angles_msg)
+        #print('pitch:', angles.pitch, 'roll:', angles.roll, 'heading:', angles.heading)
         
         
 def main(args=None):
