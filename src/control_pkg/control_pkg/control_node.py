@@ -106,14 +106,8 @@ class ControlNode(Node):
         """ self.create_subscription(NavSatFix, "fix", self.gps_callback, 10)
         self.create_subscription(Joy, "joy", self.joy_cb, 10)
         self.create_subscription(Twist, "cmd_vel", self.twist_cb, 10)
-<<<<<<< HEAD
-        self.create_subscription(LaserScan, "scan", self.lidar_cb, 10)
-        self.create_subscription(String, "target_detected", self.image_cb, 10)
-        
-=======
         self.create_subscription(LaserScan, "scan", self.lidar_cb, 10) """
 
->>>>>>> test_control_node
         # Publisher
         self.robot_pub = self.create_publisher(Twist, 'cmd_vel_team10', 10)
         self.heartbeat_pub = self.create_publisher(
@@ -149,7 +143,6 @@ class ControlNode(Node):
 
         self.angle_counter = -1
         self.turning_angle = 0
-<<<<<<< HEAD
         self.first_turning = False
         
         self.lidar = LidarScan()
@@ -202,7 +195,6 @@ class ControlNode(Node):
             w = -0.5
 
         control_msg = self.convert_msg(0.0, w)
-        self.robot_pub.publish(control_msg) """
         self.robot_pub.publish(control_msg) """
 
     def get_relative_dist(self, lat1, lat2, long1, long2):
@@ -282,20 +274,6 @@ class ControlNode(Node):
             self.angle_counter = -1
             self.long = 0
             self.lat = 0
-<<<<<<< HEAD
-            self.following_mode = FOWLLOW_MODE.FOLLOWING
-            # if abs(rot) <= ANGLE_MARGIN:
-            #     return
-            # # Turning
-            # self.turn_robot(rot)
-            # self.turn_robot(1000)
-            # self.first_turning = True
-            
-            
-            
-=======
-
->>>>>>> test_control_node
         elif (msg.buttons[4]):
             print('Button 4')
         elif (msg.buttons[5]):

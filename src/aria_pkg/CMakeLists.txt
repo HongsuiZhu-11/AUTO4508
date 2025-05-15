@@ -45,6 +45,7 @@ ament_target_dependencies(ariaNode
 "example_interfaces"
 "std_msgs"
 "rosidl_default_runtime"
+"aria_pkg"
 )
 
 target_include_directories(ariaNode PRIVATE
@@ -58,6 +59,7 @@ target_link_libraries(
 
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 add_dependencies(ariaNode ${cpp_typesupport_target})
+message(STATUS "Typesupport target: ${cpp_typesupport_target}")
 
 install(TARGETS
 ariaNode
