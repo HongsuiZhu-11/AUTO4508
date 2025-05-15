@@ -82,8 +82,8 @@ class CameraViewer(Node):
         
         self.live_label = tk.Label(self.content_frame)
         self.image_label = tk.Label(self.content_frame)
-        self.lidar_label = tk.Label(self.content_frame)
-        self.gps_label = tk.Label(self.content_frame)
+        self.lidar_frame = tk.Frame(self.content_frame)
+        self.gps_frame = tk.Frame(self.content_frame)
         
 
     def next_mode(self):
@@ -147,7 +147,11 @@ class CameraViewer(Node):
     def ui_lidar_mode(self):
         """ Update the UI to show the LiDAR viewer """
         # Place Label that holds LiDAR viewer
-        self.lidar_label.grid(row=0, column=0, rowspan=2, columnspan=2, sticky="nsew")
+        self.lidar_frame.grid(row=0, column=0, rowspan=2, columnspan=2, sticky="nsew")
+        for i in range(2):
+            self.lidar_frame.grid_rowconfigure(i, weight=1)
+        for i in range(2):
+            self.lidar_frame.grid_columnconfigure(i, weight=1)
         # Title
         tk.Label(self.button_center_frame, text="LiDAR Data", font=("Arial", 16)).grid(row=0, column=0, rowspan=3, columnspan=3, sticky="ew")
     
@@ -155,7 +159,11 @@ class CameraViewer(Node):
     def ui_gps_mode(self):
         """ Update the UI to show the GPS viewer """
         # Place Label that holds GPS viewer
-        self.gps_label.grid(row=1, column=0, rowspan=7, columnspan=3, sticky="nsew")
+        self.gps_frame.grid(row=0, column=0, rowspan=2, columnspan=2, sticky="nsew")
+        for i in range(3):
+            self.gps_frame.grid_rowconfigure(i, weight=1)
+        for i in range(2):
+            self.gps_frame.grid_columnconfigure(i, weight=1)
         # Title
         tk.Label(self.button_center_frame, text="GPS Data", font=("Arial", 16)).grid(row=0, column=0, rowspan=3, columnspan=3, sticky="ew")
 
@@ -186,8 +194,8 @@ class CameraViewer(Node):
         if not self.mode == 3:
             return
         else:
-            tk.Label(self.content_frame, text=f'Latitude: {latitude}').grid(row=0,column=0, sticky='ew')
-            tk.Label(self.content_frame, text=f'Longitude: {longitude}').grid(row=0,column=1, sticky='ew')
+            tk.Label(self.gps_frame, text=f'Latitude: {latitude}', font=("Arial", 16)).grid(row=0,column=0, sticky='ew')
+            tk.Label(self.content_frame, text=f'Longitude: {longitude}', font=("Arial", 16)).grid(row=1,column=0, sticky='ew')
 
 
 
@@ -204,8 +212,9 @@ class CameraViewer(Node):
         if not self.mode == 2:
             return
         else:
-            tk.Label(self.content_frame, text=f"OBSTACLE DETECTED? {'TRUE'if obstacle else 'FALSE'}").grid(row=0, column=0, columnspan=2, sticky='nsew')
-            tk.Label(self.content_frame, text=f"Minimum Angle: {min_angle}\nMinimum_Range: {min_range}").grid(row=1, column=0, columnspan=2, sticky='nsew')
+            tk.Label(self.lidar_frame, text=f"OBSTACLE DETECTED? {'TRUE'if obstacle else 'FALSE'}", font=("Arial", 16)).grid(row=0, column=0, columnspan=2, sticky='nsew')
+            tk.Label(self.lidar_frame, text=f"Minimum Angle: {min_angle}", font=("Arial", 16)).grid(row=1, column=0, sticky='nsew')
+            tk.Label(self.lidar_frame, text=f"Minimum_Range: {min_range}", font=("Arial", 16)).grid(row=1, column=1, sticky='nsew')
 
 
     def imu_cb(self, msg):
@@ -218,8 +227,9 @@ class CameraViewer(Node):
         if not self.mode == 3:
             return
         else:
-            tk.Label(self.content_frame, text=f'Pitch: {pitch}\nRoll: {roll}').grid(row=1,column=0, sticky='ew')
-            tk.Label(self.content_frame, text=f'heading: {heading}').grid(row=1, column=1, sticky='ew')
+            tk.Label(self.gps_frame, text=f'Pitch: {pitch}', font=("Arial", 16)).grid(row=0,column=1, sticky='ew')
+            tk.Label(self.gps_frame, text=f'Roll: {roll}', font=("Arial", 16)).grid(row=1,column=1, sticky='ew')
+            tk.Label(self.gps_frame, text=f'heading: {heading}', font=("Arial", 16)).grid(row=2, column=1, sticky='ew')
 
         
     def display_image(self):
