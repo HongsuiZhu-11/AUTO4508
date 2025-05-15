@@ -209,6 +209,7 @@ class ControlNode(Node):
                 return
 
     def joy_cb(self, msg):
+        # print(msg)
         if (msg.buttons[1]):  # B Circle
             print('Button 1 - manual', 'trigger ', self.trigger)
             self.drive_mode = DRIVE_MODE.MANUAL
@@ -222,13 +223,32 @@ class ControlNode(Node):
             self.angle_counter = -1
             self.long = 0
             self.lat = 0
+
+        elif (msg.buttons[4]):
+            print('Button 4')
+        elif (msg.buttons[5]):
+            print('Button 5')
+        elif (msg.buttons[6]):
+            print('Button 6')
+        elif (msg.buttons[7]):
+            print('Button 7')
+        elif (msg.buttons[11]):
+            # print('Button 11 - up - trigger', self.trigger)
+            control_msg = self.convert_msg(1.0, 0.0)
+            self.robot_pub.publish(control_msg)
+        elif (msg.buttons[12]):
+            # print('Button 12 - down - trigger', self.trigger)
+            control_msg = self.convert_msg(-1.0, 0.0)
+            self.robot_pub.publish(control_msg)
         elif (msg.buttons[13]):
             if (self.angle_counter >= 0):
                 return
+            # print('Button 13 - LEFT- trigger', self.trigger)
             self.turn_robot(10)
         elif (msg.buttons[14]):
             if (self.angle_counter >= 0):
                 return
+            print('Button 14 - RIGHT- trigger', self.trigger)
             self.turn_robot(-10)
 
         if (msg.axes[5] < 0):
