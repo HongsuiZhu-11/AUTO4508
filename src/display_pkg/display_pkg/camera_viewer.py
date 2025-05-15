@@ -30,7 +30,7 @@ class CameraViewer(Node):
         self.mode = 0  # Track whether live mode is active
         
         # Image Directory
-        self.image_dir = "/home/team10/AUTO4508/center_detected_images"
+        self.image_dir = "/home/team10/center_detected_images"
         if not os.path.exists(self.image_dir):
             os.makedirs(self.image_dir)  # Create the directory if it doesn't exist
             self.get_logger().info(f"Directory '{self.image_dir}' created.")
@@ -183,6 +183,13 @@ class CameraViewer(Node):
     def gps_cb(self, msg):
         latitude = msg.latitude
         longitude = msg.longitude
+        if not self.mode == 3:
+            return
+        else:
+            tk.Label(self.content_frame, text=f'Latitude: {latitude}').grid(row=0,column=0, sticky='ew')
+            tk.Label(self.content_frame, text=f'Longitude: {longitude}').grid(row=0,column=1, sticky='ew')
+
+
 
     def obstacle_cb(self, msg):
         if (len(msg.data) != 3):
@@ -194,13 +201,26 @@ class CameraViewer(Node):
         
         min_range = msg.data[1]
         min_angle = msg.data[2]
-    
+        if not self.mode == 2:
+            return
+        else:
+            tk.Label(self.content_frame, text=f"OBSTACLE DETECTED? {'TRUE'if obstacle else 'FALSE'}").grid(row=0, column=0, columnspan=2, sticky='nsew')
+            tk.Label(self.content_frame, text=f"Minimum Angle: {min_angle}\nMinimum_Range: {min_range}").grid(row=1, column=0, columnspan=2, sticky='nsew')
+
+
     def imu_cb(self, msg):
+        
         if (len(msg.data) != 3):
             print('imu_cb Massage not matching')
         pitch = msg.data[0]
         roll = msg.data[1]
         heading = msg.data[2]
+        if not self.mode == 3:
+            return
+        else:
+            tk.Label(self.content_frame, text=f'Pitch: {pitch}\nRoll: {roll}').grid(row=1,column=0, sticky='ew')
+            tk.Label(self.content_frame, text=f'heading: {heading}').grid(row=1, column=1, sticky='ew')
+
         
     def display_image(self):
         """ Display the current image based on self.image_index """
