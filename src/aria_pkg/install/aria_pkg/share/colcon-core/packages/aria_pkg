@@ -1,1 +1,1 @@
-geometry_msgs:rclcpp
+example_interfaces:geometry_msgs:rclcpp:rosidl_default_runtime:std_srvs
