@@ -165,7 +165,7 @@ class CameraViewer(Node):
         for i in range(2):
             self.gps_frame.grid_columnconfigure(i, weight=1)
         # Title
-        tk.Label(self.button_center_frame, text="GPS Data", font=("Arial", 16)).grid(row=0, column=0, rowspan=3, columnspan=3, sticky="ew")
+        tk.Label(self.button_center_frame, text="GPS and IMU Data", font=("Arial", 16)).grid(row=0, column=0, rowspan=3, columnspan=3, sticky="ew")
 
 
     def camera_annotated_callback(self, msg):
