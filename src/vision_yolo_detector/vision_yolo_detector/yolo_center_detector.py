@@ -31,7 +31,9 @@ class YoloCenterDetector(Node):
         # State
         self.latest_depth = None
         self.saved_labels = set()
-        os.makedirs("center_detected_images", exist_ok=True)
+        self.save_dir = '/home/team10/center_detected_images'
+        os.makedirs(self.save_dir, exist_ok=True)
+
 
         self.get_logger().info("🚀 YOLO detector initialized with automatic class recognition.")
 
