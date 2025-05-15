@@ -46,9 +46,6 @@ class SickScanNode: public rclcpp::Node {
 
         void lidar_timer_callback()
         {
-            if (!latest_msg) {
-                return;
-            }
             rclcpp::Time now = this->get_clock()->now();
             if (now - last_message_time_ > rclcpp::Duration::from_seconds(1.0)) {
                 return;

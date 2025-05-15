@@ -13,6 +13,8 @@ from geometry_msgs.msg import Twist
 
 from example_interfaces.srv import Float64
 
+from example_interfaces.srv import Float64
+
 from enum import Enum
 import math
 
@@ -99,6 +101,8 @@ class ControlNode(Node):
         # Subscribers
         self.create_subscription(NavSatFix, "fix", self.gps_callback, 10)
         self.create_subscription(Joy, "joy", self.joy_cb, 10)
+        self.create_subscription(NavSatFix, "fix", self.gps_callback, 10)
+        self.create_subscription(Joy, "joy", self.joy_cb, 10)
         """ self.create_subscription(NavSatFix, "fix", self.gps_callback, 10)
         self.create_subscription(Joy, "joy", self.joy_cb, 10)
         self.create_subscription(Twist, "cmd_vel", self.twist_cb, 10)
@@ -115,6 +119,10 @@ class ControlNode(Node):
         self.heartbeat_pub = self.create_publisher(
             Int32, 'heartbeat_team10', 10)
         # self.report_pub = self.create_publisher(String, 'report_team10', 10)
+
+        # Service Clients
+        self.drive_client = self.create_client(Float64, 'drive_distance')
+        self.turn_client = self.create_client(Float64, 'turn_angle')
 
         # Service Clients
         self.drive_client = self.create_client(Float64, 'drive_distance')
@@ -145,50 +153,6 @@ class ControlNode(Node):
         self.first_turning = False
         
         self.lidar = LidarScan()
-        
-    def image_cb(self, msg):
-        image_margin = 30
-        detected = msg.data
-        if ('cone-orange' in detected):
-            offset = detected.split(',')[1]
-            offset = offset[len('offset=')+1:]
-            offset = int(offset)
-            if (self.first_turning):
-                if offset < -image_margin:
-                    # turn right
-                    self.turn_robot(-45)
-                elif offset > image_margin:
-                    # turn left
-                    self.turn_robot(45)
-                else:
-                    control_msg = self.convert_msg(0.0, 0.0)
-                    self.robot_pub.publish(control_msg)
-                    self.angle_counter = -1
-                    self.first_turning = False
-            
-        elif ('bucket-red' in detected or  'cone-yellow-green'in detected):
-            offset = detected.split(',')[1]
-            offset = offset[len('offset=')+1:]
-            offset = int(offset)
-            if (self.following_mode == FOWLLOW_MODE.FINDING):
-                # if offset < -image_margin:
-                #     # turn right
-                #     pass
-                # elif offset > image_margin:
-                #     # turn left
-                #     pass
-                # else:
-                control_msg = self.convert_msg(0.0, 0.0)
-                self.robot_pub.publish(control_msg)
-                self.angle_counter = -1
-                self.first_turning = False
-                detected_angle = self.lidar.get_distance(0)
-
-            
-    
-=======
-
-        self.lidar = LidarScan()
 
     def convert_msg(self, linear: float, angular: float):
         msg = Twist()
@@ -198,98 +162,19 @@ class ControlNode(Node):
         self.angualr = angular
         return msg
 
->>>>>>> test_control_node
     def gps_callback(self, msg):
         curr_lat = msg.latitude
         curr_long = msg.longitude
         # print(f"{curr_lat}, {curr_long}")
 
-<<<<<<< HEAD
-
-        if self.drive_mode != DRIVE_MODE.AUTO:
-            #print('not Driving', self.drive_mode)
-            return
-        
-        if not self.trigger:
-            #print('not trigger', self.trigger)
-            return
-
-        if self.angle_counter >=0:
-            # on Turning
-            #print("on Turning", self_counter)
-            return
-        
-        if self.first_turning:
-            # on Turning
-            return
-        
-=======
->>>>>>> test_control_node
         if self.lat == 0 or self.long == 0:
             # print('set current gps')
             self.lat = curr_lat
             self.long = curr_long
+            # print('set current gps')
+            self.lat = curr_lat
+            self.long = curr_long
             return
-<<<<<<< HEAD
-        
-        target_lat = WAY_POINTS[self.current_point][0]
-        target_long = WAY_POINTS[self.current_point][1]
-        tart_dist, target_angle, rot = self.get_relative_dist(cur_lat, target_lat, cur_long, target_long)
-        print('dist',tart_dist, 'angle',target_angle, 'cur_angle', self.angle, 'rot', rot)
-        # check goal
-        if tart_dist <= DEST_MARGIN:
-            print('Arrive: ', self.current_point)
-            
-            control_msg = self.convert_msg(0.0, 0.0)
-            self.robot_pub.publish(control_msg)
-            self.is_start = False
-            # TODO Find Optical
-            # while Object not not in center of frame
-            #   Turn toward Object
-            #       read Lidar at 0 (forward)
-            #       
-
-            self.following_mode = FOWLLOW_MODE.FINDING
-            self.current_point += 1
-            self.turn_robot(1000)
-            return
-             
-        if not self.is_start and self.following_mode != FOWLLOW_MODE.FINDING:
-            self.is_start = True
-            self.following_mode = FOWLLOW_MODE.FOLLOWING
-            # if abs(rot) <= ANGLE_MARGIN:
-            #     return
-            # # Turning
-            # self.turn_robot(rot)
-            self.turn_robot(1000)
-            self.first_turning = True
-            return
-        
-        
-        # calc angle
-        dist, angle, _ = self.get_relative_dist(self.lat, cur_lat, self.long, cur_long)
-        if dist >= DIST_MIN:
-            print('Adjust - dist', dist, 'adjusted angle', angle)
-            self.angle = angle
-            self.lat = cur_lat
-            self.long = cur_long
-            
-            rot = int(target_angle - self.angle)
-            if (rot > 180):
-                rot = rot - 360
-            elif (rot < -180):
-                rot = rot + 360
-                    
-            if abs(rot) <= ANGLE_MARGIN:
-                return
-            # Turning
-            self.turn_robot(rot)
-            return
-        
-        # 500mm/s 
-        control_msg = self.convert_msg(1.0, 0.0)
-        self.robot_pub.publish(control_msg)
-=======
 
         if self.drive_mode == DRIVE_MODE.AUTO:
             # print("Control: in auto mode")
@@ -299,7 +184,6 @@ class ControlNode(Node):
                 curr_lat, target_lat, curr_long, target_long)
             """ print(
                 f"Dist:{tart_dist}, angle:{target_angle}, curr_angle:{self.angle}, rot:{rot}") """
->>>>>>> test_control_node
 
             self.send_turn_request(float(rot))
             if tart_dist > DEST_MARGIN:
@@ -318,6 +202,7 @@ class ControlNode(Node):
             w = -0.5
 
         control_msg = self.convert_msg(0.0, w)
+        self.robot_pub.publish(control_msg) """
         self.robot_pub.publish(control_msg) """
 
     def get_relative_dist(self, lat1, lat2, long1, long2):
@@ -355,6 +240,8 @@ class ControlNode(Node):
         elif (rot < -180):
             rot = rot + 360
 
+        print(f"Dist:{dist}, Angle:{angle}, Rot:{rot}, test_Dist:{test_dist}, test_Angle:{test_angle}")
+        return dist, test_angle, rot
         print(f"Dist:{dist}, Angle:{angle}, Rot:{rot}, test_Dist:{test_dist}, test_Angle:{test_angle}")
         return dist, test_angle, rot
         # x_distance = x_difference * 111.320 * (math.cos(y_difference * math.pi / 180)) *1000
@@ -419,21 +306,27 @@ class ControlNode(Node):
             print('Button 7')
         elif (msg.buttons[11]):
             # print('Button 11 - up - trigger', self.trigger)
+            # print('Button 11 - up - trigger', self.trigger)
             control_msg = self.convert_msg(1.0, 0.0)
+            # self.robot_pub.publish(control_msg)
             # self.robot_pub.publish(control_msg)
         elif (msg.buttons[12]):
             # print('Button 12 - down - trigger', self.trigger)
+            # print('Button 12 - down - trigger', self.trigger)
             control_msg = self.convert_msg(-1.0, 0.0)
+            # self.robot_pub.publish(control_msg)
             # self.robot_pub.publish(control_msg)
         elif (msg.buttons[13]):
             if (self.angle_counter >= 0):
                 return
+            # print('Button 13 - LEFT- trigger', self.trigger)
             # print('Button 13 - LEFT- trigger', self.trigger)
             self.turn_robot(10)
         elif (msg.buttons[14]):
             if (self.angle_counter >= 0):
                 return
             print('Button 14 - RIGHT- trigger', self.trigger)
+            # self.turn_robot(-10)
             # self.turn_robot(-10)
 
         if (msg.axes[5] < 0):
@@ -443,6 +336,7 @@ class ControlNode(Node):
             self.is_start = False
             if (self.linear != 0.0 or self.angualr != 0.0):
                 control_msg = self.convert_msg(0.0, 0.0)
+                # self.robot_pub.publish(control_msg)
                 # self.robot_pub.publish(control_msg)
             self.angle_counter = -1
 
