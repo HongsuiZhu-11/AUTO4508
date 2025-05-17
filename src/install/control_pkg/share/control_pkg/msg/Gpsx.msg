@@ -1,1 +1,0 @@
-/home/shawn/AUTO4508/src/build/control_pkg/msg/Gpsx.msg

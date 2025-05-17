@@ -84,19 +84,17 @@ class ControlNode(Node):
         self.create_subscription(NavSatFix, "fix", self.gps_callback, 10)
         self.create_subscription(Joy, "joy", self.joy_cb, 10)
         self.create_subscription(LaserScan, "scan", self.lidar_cb, 10)
+        self.create_subscription(NavSatFix, "fix", self.gps_callback, 10)
+        # self.create_subscription(Twist, "cmd_vel", self.twist_cb, 10)
 
         # Publisher
         self.robot_pub = self.create_publisher(Twist, 'cmd_vel_team10', 10)
         self.heartbeat_pub = self.create_publisher(
             Int32, 'heartbeat_team10', 10)
         self.distance_pub = self.create_publisher(
-            Float32, 'drive_distance', 10)  # Add
+            Float32, 'drive_distance', 10)
         self.angle_pub = self.create_publisher(
-            Float32, 'turn_angle', 10)  # Add
-
-        # Remove service clients
-        # self.drive_client = self.create_client(Float64, 'drive_distance')
-        # self.turn_client = self.create_client(Float64, 'turn_angle')
+            Float32, 'turn_angle', 10)
 
         # Timer
         self.create_timer(0.04, self.timer_cb)
@@ -134,23 +132,24 @@ class ControlNode(Node):
     def gps_callback(self, msg):
         curr_lat = msg.latitude
         curr_long = msg.longitude
+        print(f"lat:{curr_lat}, long:{curr_long}")
 
         if self.lat == 0 or self.long == 0:
             self.lat = curr_lat
             self.long = curr_long
             return
 
-        if self.drive_mode == DRIVE_MODE.AUTO:
-            target_lat = WAY_POINTS[self.current_point][0]
-            target_long = WAY_POINTS[self.current_point][1]
-            tart_dist, target_angle, rot = self.get_relative_dist(
-                curr_lat, target_lat, curr_long, target_long)
+        target_lat = WAY_POINTS[self.current_point][0]
+        target_long = WAY_POINTS[self.current_point][1]
+        tar_dist, target_angle, rot = self.get_relative_dist(
+            curr_lat, target_lat, curr_long, target_long)
 
-            self.send_turn_request(float(rot))
-            if tart_dist > DEST_MARGIN:
-                self.send_drive_request(float(tart_dist))
-            elif self.current_point < 3:
-                self.current_point += 1
+        print(f"rot:{rot},dist:{tar_dist}")
+        self.send_turn_request(float(rot))
+        self.send_drive_request(float(tar_dist))
+        """ if tar_dist > DEST_MARGIN:
+        elif self.current_point < 3:
+            self.current_point += 1 """
 
     def send_turn_request(self, angle):
         angle_msg = Float32()
@@ -197,16 +196,11 @@ class ControlNode(Node):
         self.lidar.scan_update(msg.angle_min, msg.angle_max,
                                msg.angle_increment, msg.ranges)
 
-        if (self.drive_mode == DRIVE_MODE.MANUAL):
-            return
-
-        if (self.drive_mode == DRIVE_MODE.AUTO and self.trigger):
-            min_range, _ = self.lidar.get_min_range()
-            if (min_range < LIDAR_STOP_DISTANCE):
-                print('Obstacle detected')
-                control_msg = self.convert_msg(0.0, 0.0)
-                self.robot_pub.publish(control_msg)
-                return
+        min_range, _ = self.lidar.get_min_range()
+        if (min_range < LIDAR_STOP_DISTANCE):
+            #print('Obstacle detected')
+            control_msg = self.convert_msg(0.0, 0.0)
+            self.robot_pub.publish(control_msg)
 
     def joy_cb(self, msg):
         # print(msg)
@@ -261,7 +255,7 @@ class ControlNode(Node):
                 self.robot_pub.publish(control_msg)
             self.angle_counter = -1
 
-    def turn_robot(self, angle):
+    """ def turn_robot(self, angle):
         self.turning_angle = angle
         self.angle_counter = 0
         if (angle > 0):
@@ -269,12 +263,12 @@ class ControlNode(Node):
         else:
             w = -0.5
         control_msg = self.convert_msg(0.0, w)
-        self.robot_pub.publish(control_msg)
+        self.robot_pub.publish(control_msg) """
 
-    def twist_cb(self, msg):
+    """ def twist_cb(self, msg):
         if (self.drive_mode == DRIVE_MODE.MANUAL):
             self.robot_pub.publish(msg)
-
+ """
     def timer_cb(self):
         if (self.angle_counter < 0):
             return
@@ -305,7 +299,6 @@ class ControlNode(Node):
         else:
             heartbeat_msg.data = 0
         self.heartbeat_pub.publish(heartbeat_msg)
-
 
 def main(args=None):
     rclpy.init(args=args)

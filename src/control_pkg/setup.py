@@ -20,7 +20,6 @@ setup(
     entry_points={
         'console_scripts': [
             'control_node = control_pkg.control_node:main',
-            'camera_node = control_pkg.camera_node:main'
         ],
     },
 )

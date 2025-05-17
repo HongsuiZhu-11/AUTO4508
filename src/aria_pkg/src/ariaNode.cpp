@@ -12,6 +12,8 @@ public:
     ArArgumentParser parser(&argc, argv);
     parser.loadDefaultArguments();
     ArRobotConnector connector(&parser, &robot_);
+
+
     if (!connector.connectRobot()) {
       RCLCPP_FATAL(get_logger(), "Failed to connect to Aria robot");
       rclcpp::shutdown();
@@ -101,12 +103,8 @@ private:
   ArRobot robot_;
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
   rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr heartbeat_sub_;
-  // Remove service related
-  // rclcpp::Service<aria_pkg::srv::DriveDistance>::SharedPtr drive_service_;
-  // rclcpp::Service<aria_pkg::srv::TurnAngle>::SharedPtr turn_service_;
-  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr distance_sub_; // Add
-  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr angle_sub_;    // Add
-
+  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr distance_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr angle_sub_;
   rclcpp::Time last_heartbeat_time_;
 };
 

@@ -7,7 +7,7 @@
 # since a plain shell script can't determine its own path when being sourced
 # either use the provided COLCON_CURRENT_PREFIX
 # or fall back to the build time prefix (if it exists)
-_colcon_prefix_chain_sh_COLCON_CURRENT_PREFIX=/home/team10/ws/AUTO4508/src/control_pkg/install
+_colcon_prefix_chain_sh_COLCON_CURRENT_PREFIX=/home/timon-l/devel/auto4508/project/AUTO4508/src/control_pkg/install
 if [ ! -z "$COLCON_CURRENT_PREFIX" ]; then
   _colcon_prefix_chain_sh_COLCON_CURRENT_PREFIX="$COLCON_CURRENT_PREFIX"
 elif [ ! -d "$_colcon_prefix_chain_sh_COLCON_CURRENT_PREFIX" ]; then
@@ -35,19 +35,7 @@ COLCON_CURRENT_PREFIX="/opt/ros/jazzy"
 _colcon_prefix_chain_sh_source_script "$COLCON_CURRENT_PREFIX/local_setup.sh"
 
 # setting COLCON_CURRENT_PREFIX avoids relying on the build time prefix of the sourced script
-<<<<<<< HEAD
-COLCON_CURRENT_PREFIX="/home/team10/AUTO4508/src/control_pkg/control_pkg/install"
-_colcon_prefix_chain_sh_source_script "$COLCON_CURRENT_PREFIX/local_setup.sh"
-
-# setting COLCON_CURRENT_PREFIX avoids relying on the build time prefix of the sourced script
-COLCON_CURRENT_PREFIX="/home/team10/AUTO4508/install"
-=======
-COLCON_CURRENT_PREFIX="/home/team10/ws/ros2GPSx/install"
-_colcon_prefix_chain_sh_source_script "$COLCON_CURRENT_PREFIX/local_setup.sh"
-
-# setting COLCON_CURRENT_PREFIX avoids relying on the build time prefix of the sourced script
-COLCON_CURRENT_PREFIX="/home/team10/ws/AUTO4508/src/install"
->>>>>>> test_control_node
+COLCON_CURRENT_PREFIX="/home/timon-l/devel/auto4508/project/gazebo_ws/src/p3at_description/install"
 _colcon_prefix_chain_sh_source_script "$COLCON_CURRENT_PREFIX/local_setup.sh"
 
 
