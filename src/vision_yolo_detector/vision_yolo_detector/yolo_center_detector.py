@@ -7,7 +7,6 @@ from ultralytics import YOLO
 import cv2
 import numpy as np
 import os
-from datetime import datetime
 import pkg_resources
 
 class YoloCenterDetector(Node):
@@ -26,19 +25,13 @@ class YoloCenterDetector(Node):
         # Load model
         model_path = os.path.join(pkg_resources.resource_filename('vision_yolo_detector', 'model'), 'best_object.pt')
         self.model = YOLO(model_path)
-        self.all_classes = set(self.model.names.values())  # Detect all classes
+        self.all_classes = set(self.model.names.values())
 
-        # State
         self.latest_depth = None
-        self.saved_labels = set()
-        self.save_dir = '/home/team10/center_detected_images'
-        os.makedirs(self.save_dir, exist_ok=True)
 
-
-        self.get_logger().info("🚀 YOLO detector initialized with automatic class recognition.")
+        self.get_logger().info("✅ YOLO center detector initialized (detection only).")
 
     def get_color_for_class(self, label):
-        # Generate a unique BGR color for each label using HSV hash
         h = hash(label) % 180
         hsv_color = np.uint8([[[h, 255, 255]]])
         bgr_color = cv2.cvtColor(hsv_color, cv2.COLOR_HSV2BGR)[0][0]
@@ -63,32 +56,21 @@ class YoloCenterDetector(Node):
             cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
             offset = cx - center_x
 
-            # Get depth
             depth = -1
             if self.latest_depth is not None and 0 <= cy < self.latest_depth.shape[0] and 0 <= cx < self.latest_depth.shape[1]:
                 depth = int(self.latest_depth[cy, cx])
 
             detections.append(f"{label}, offset={offset}, depth_mm={depth}")
 
-            # Draw annotation
             color = self.get_color_for_class(label)
             cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
             cv2.putText(annotated, f"{label}", (x1, y1 - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
-            # Save one image per label
-            if label not in self.saved_labels:
-                self.saved_labels.add(label)
-                filename = f"center_detected_images/{label}_{datetime.now().strftime('%H%M%S')}.jpg"
-                cv2.imwrite(filename, annotated)
-                self.get_logger().info(f"📸 Saved image for label '{label}': {filename}")
-
-        # Publish detection string
         msg_out = " | ".join(detections) if detections else "No valid target"
         self.publisher_.publish(String(data=msg_out))
         self.get_logger().info(f"📢 {msg_out}")
 
-        # Publish annotated image stream
         annotated_msg = self.bridge.cv2_to_imgmsg(annotated, encoding='bgr8')
         self.annotated_pub.publish(annotated_msg)
 
