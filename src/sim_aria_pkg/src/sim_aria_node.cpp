@@ -30,8 +30,9 @@ public:
             timerCallback();
         });
 
-        linear_speed_ = 0.2;   // m/s
-        angular_speed_ = 0.5;  // rad/s
+        linear_speed_ = 1.0;   // m/s
+        angular_speed_ = 2.0;  // rad/s
+        time_factor_ = 1.15;
         driving_ = false;
         turning_ = false;
     }
@@ -46,7 +47,7 @@ private:
             active_duration_ =
                 std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::duration<float>(
-                        std::abs(distance_m) / linear_speed_));
+                        std::abs(distance_m) / linear_speed_ * time_factor_));
             active_command_.linear.x = (distance_m > 0) ? linear_speed_ : -linear_speed_;
             active_command_.angular.z = 0.0;
         }
@@ -61,9 +62,10 @@ private:
             active_duration_ =
                 std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::duration<float>(
-                        std::abs(angle_rad) / angular_speed_));
+                        std::abs(angle_rad) / angular_speed_ * time_factor_));
             active_command_.linear.x = 0.0;
             active_command_.angular.z = (angle_rad > 0) ? angular_speed_ : -angular_speed_;
+            RCLCPP_INFO(get_logger(), "Setting angular velocity: %.2f rad/s for %.2ld ms", active_command_.angular.z, active_duration_.count());
         }
     }
 
@@ -103,6 +105,7 @@ private:
     std::chrono::milliseconds active_duration_{ 0 };
     float linear_speed_;
     float angular_speed_;
+    float time_factor_;
     bool driving_;
     bool turning_;
 };
