@@ -84,16 +84,14 @@ private:
     robot_.lock();
     robot_.move(distance_mm);
     robot_.unlock();
-    // No response needed for a subscription
   }
 
   void turnAngleCallback(const std_msgs::msg::Float32::SharedPtr msg) {
     double angle_degrees = msg->data;
-    RCLCPP_INFO(get_logger(), "Turning angle: %.2f degrees", angle_degrees);
+    RCLCPP_INFO(get_logger(), "V2:Turning angle: %.2f degrees", angle_degrees);
     robot_.lock();
     robot_.setDeltaHeading(angle_degrees);
     robot_.unlock();
-    // No response needed for a subscription
   }
 
   float x, y, rot;

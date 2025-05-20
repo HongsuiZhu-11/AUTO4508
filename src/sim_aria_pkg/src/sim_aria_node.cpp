@@ -3,117 +3,114 @@
 #include "std_msgs/msg/float32.hpp"
 #include <chrono>
 #include <cmath>
+#include <mutex>
 
 using namespace std::chrono_literals;
 
 class SimControllerSimplified : public rclcpp::Node {
-public:
-    SimControllerSimplified()
-    : Node("sim_controller_simplified")
-    {
-        cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>(
-            "cmd_vel_team10", 10);
+    public:
+	SimControllerSimplified()
+		: Node("sim_controller_simplified")
+	{
+		cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>(
+			"cmd_vel_team10", 10);
 
-        distance_sub_ = create_subscription<std_msgs::msg::Float32>(
-            "drive_distance", 10,
-            [this](const std_msgs::msg::Float32::SharedPtr msg) {
-                driveDistanceCallback(msg->data);
-            });
+		// Configure speeds and time factor
+		linear_speed_ = 0.5; // m/s
+		angular_speed_ = 1.0; // rad/s
+		time_factor_ = 1.2;
 
-        angle_sub_ = create_subscription<std_msgs::msg::Float32>(
-            "turn_angle", 10,
-            [this](const std_msgs::msg::Float32::SharedPtr msg) {
-                turnAngleCallback(msg->data);
-            });
+		// Subscriptions
+		distance_sub_ = create_subscription<std_msgs::msg::Float32>(
+			"drive_distance", 10,
+			[this](const std_msgs::msg::Float32::SharedPtr msg) {
+				std::lock_guard<std::mutex> lock(
+					command_mutex_);
+				if (!current_drive_active_) {
+					float distance = msg->data;
+					drive_duration_ = std::chrono::duration_cast<
+						std::chrono::milliseconds>(
+						std::chrono::duration<float>(
+							std::abs(distance) /
+							linear_speed_ *
+							time_factor_));
+					drive_start_ = this->now();
+					current_drive_active_ = true;
+					current_command_.linear.x =
+						(distance > 0) ? linear_speed_ :
+								 -linear_speed_;
+				}
+			});
 
-        timer_ = create_wall_timer(100ms, [this]() {
-            timerCallback();
-        });
+		angle_sub_ = create_subscription<std_msgs::msg::Float32>(
+			"turn_angle", 10,
+			[this](const std_msgs::msg::Float32::SharedPtr msg) {
+				std::lock_guard<std::mutex> lock(
+					command_mutex_);
+				if (!current_turn_active_) {
+					float angle = msg->data;
+					turn_duration_ = std::chrono::duration_cast<
+						std::chrono::milliseconds>(
+						std::chrono::duration<float>(
+							std::abs(angle) /
+							angular_speed_ *
+							time_factor_));
+					turn_start_ = this->now();
+					current_turn_active_ = true;
+					current_command_.angular.z =
+						(angle > 0) ? angular_speed_ :
+							      -angular_speed_;
+				}
+			});
 
-        linear_speed_ = 1.0;   // m/s
-        angular_speed_ = 2.0;  // rad/s
-        time_factor_ = 1.15;
-        driving_ = false;
-        turning_ = false;
-    }
+		// Main command timer
+		timer_ = create_wall_timer(50ms, [this]() {
+			std::lock_guard<std::mutex> lock(command_mutex_);
+			auto now = this->now();
 
-private:
-    void driveDistanceCallback(float distance_m)
-    {
-        RCLCPP_INFO(get_logger(), "Driving: %.2f meters", distance_m);
-        if (!driving_ && !turning_) {
-            driving_ = true;
-            start_time_ = now();
-            active_duration_ =
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::duration<float>(
-                        std::abs(distance_m) / linear_speed_ * time_factor_));
-            active_command_.linear.x = (distance_m > 0) ? linear_speed_ : -linear_speed_;
-            active_command_.angular.z = 0.0;
-        }
-    }
+			// Check drive timeout
+			if (current_drive_active_ &&
+			    (now - drive_start_) > drive_duration_) {
+				current_command_.linear.x = 0.0;
+				current_drive_active_ = false;
+			}
 
-    void turnAngleCallback(float angle_rad)
-    {
-        RCLCPP_INFO(get_logger(), "Turning: %.2f radians", angle_rad);
-        if (!driving_ && !turning_) {
-            turning_ = true;
-            start_time_ = now();
-            active_duration_ =
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::duration<float>(
-                        std::abs(angle_rad) / angular_speed_ * time_factor_));
-            active_command_.linear.x = 0.0;
-            active_command_.angular.z = (angle_rad > 0) ? angular_speed_ : -angular_speed_;
-            RCLCPP_INFO(get_logger(), "Setting angular velocity: %.2f rad/s for %.2ld ms", active_command_.angular.z, active_duration_.count());
-        }
-    }
+			// Check turn timeout
+			if (current_turn_active_ &&
+			    (now - turn_start_) > turn_duration_) {
+				current_command_.angular.z = 0.0;
+				current_turn_active_ = false;
+			}
 
-    void timerCallback()
-    {
-        if (driving_ || turning_) {
-            auto elapsed_time = now() - start_time_;
-            if (elapsed_time < active_duration_) {
-                cmd_vel_pub_->publish(active_command_);
-            } else {
-                stopRobot();
-                driving_ = false;
-                turning_ = false;
-            }
-        } else {
-            // Optionally publish zero velocity when not actively driving/turning
-            // geometry_msgs::msg::Twist stop_command;
-            // cmd_vel_pub_->publish(stop_command);
-        }
-    }
+			cmd_vel_pub_->publish(current_command_);
+		});
+	}
 
-    void stopRobot()
-    {
-        geometry_msgs::msg::Twist stop_command;
-        cmd_vel_pub_->publish(stop_command);
-        active_command_.linear.x = 0.0;
-        active_command_.angular.z = 0.0;
-    }
+    private:
+	rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
+	rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr distance_sub_;
+	rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr angle_sub_;
+	rclcpp::TimerBase::SharedPtr timer_;
 
-    rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
-    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr distance_sub_;
-    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr angle_sub_;
-    rclcpp::TimerBase::SharedPtr timer_;
+	geometry_msgs::msg::Twist current_command_;
+	std::mutex command_mutex_;
 
-    geometry_msgs::msg::Twist active_command_;
-    rclcpp::Time start_time_;
-    std::chrono::milliseconds active_duration_{ 0 };
-    float linear_speed_;
-    float angular_speed_;
-    float time_factor_;
-    bool driving_;
-    bool turning_;
+	// Drive parameters
+	float linear_speed_;
+	float angular_speed_;
+	float time_factor_;
+	bool current_drive_active_ = false;
+	bool current_turn_active_ = false;
+	rclcpp::Time drive_start_;
+	rclcpp::Time turn_start_;
+	std::chrono::milliseconds drive_duration_{ 0 };
+	std::chrono::milliseconds turn_duration_{ 0 };
 };
 
 int main(int argc, char **argv)
 {
-    rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<SimControllerSimplified>());
-    rclcpp::shutdown();
-    return 0;
+	rclcpp::init(argc, argv);
+	rclcpp::spin(std::make_shared<SimControllerSimplified>());
+	rclcpp::shutdown();
+	return 0;
 }
