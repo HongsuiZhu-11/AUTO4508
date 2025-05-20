@@ -86,6 +86,8 @@ class ControlNode(Node):
 
         self.lidar = LidarScan()
         self.trigger = False
+        self.last_linear = 0.0
+        self.last_angular = 0.0
 
         # Timers
         self.create_timer(0.25, self.heartbeat_cb)
@@ -110,12 +112,64 @@ class ControlNode(Node):
 
     def joy_cb(self, msg: Joy):
         with self.mutex:
-            if msg.buttons[1]:
-                self.drive_mode = DRIVE_MODE.AUTO
-                self.state = STATE.IDLE
-            if msg.buttons[2]:
-                self.drive_mode = DRIVE_MODE.AUTO
-            self.trigger = msg.axes[5] < 0
+            # --- Mode Switching ---
+            # Button 'X' (msg.buttons[0]) enables AUTO mode
+            if msg.buttons[0]:  # X button (PS4) / A button (Xbox)
+                if self.drive_mode != DRIVE_MODE.AUTO:
+                    self.get_logger().info('Switching to AUTO mode.')
+                    self.drive_mode = DRIVE_MODE.AUTO
+                    self.state = STATE.IDLE
+                    self.current_wp = 0
+                    self.publish_twist(0.0, 0.0)
+
+            # Button 'O' (msg.buttons[1]) enables MANUAL mode
+            elif msg.buttons[1]:  # O button (PS4) / B button (Xbox)
+                if self.drive_mode != DRIVE_MODE.MANUAL:
+                    self.get_logger().info('Switching to MANUAL mode.')
+                    self.drive_mode = DRIVE_MODE.MANUAL
+                    self.state = STATE.IDLE
+                    self.publish_twist(0.0, 0.0)
+
+            # --- Dead-Man Switch ---
+            # Use L1 button (msg.buttons[4]) as deadman switch
+            dead_man_engaged = msg.buttons[4]  # L1 button (PS4) / LB button (Xbox)
+
+            # Emergency stop if deadman released
+            if not dead_man_engaged:
+                if self.trigger:  # Only publish stop once
+                    self.publish_twist(0.0, 0.0)
+                    self.get_logger().warn('Deadman released! Emergency stop.')
+                self.trigger = False
+                return
+
+            self.trigger = True
+
+            # --- Manual Control ---
+            if self.drive_mode == DRIVE_MODE.MANUAL:
+                # Standard teleop_twist_joy configuration:
+                # Left stick vertical (axes[1]) for linear velocity
+                # Right stick horizontal (axes[3]) for angular velocity
+
+                # Apply cubic scaling for finer control
+                linear_raw = msg.axes[1]
+                angular_raw = msg.axes[3]
+
+                # Invert axes if needed and apply scaling
+                linear_vel = -(linear_raw ** 3) * 0.8  # Max 0.8 m/s
+                angular_vel = -(angular_raw ** 3) * 1.5  # Max 1.5 rad/s
+
+                # Apply smooth ramping
+                if abs(linear_vel - self.last_linear) > 0.1:
+                    linear_vel = self.last_linear + \
+                        math.copysign(0.1, linear_vel - self.last_linear)
+                if abs(angular_vel - self.last_angular) > 0.15:
+                    angular_vel = self.last_angular + \
+                        math.copysign(0.15, angular_vel - self.last_angular)
+
+                self.last_linear = linear_vel
+                self.last_angular = angular_vel
+
+                self.publish_twist(linear_vel, angular_vel)
 
     def publish_twist(self, lin: float, ang: float):
         t = Twist()
@@ -149,11 +203,13 @@ class ControlNode(Node):
                 if abs(rel_bear) > ANGLE_MARGIN:
                     self.state = STATE.TURNING
                     self.target_heading = abs_bear % 360
+                    self.expected_turn_duration = abs(math.radians(
+                        rel_bear)) / self.angular_speed * self.time_factor
+                    self.last_action_time = self.get_clock().now()
                     rad = -math.radians(rel_bear)
                     self.angle_pub.publish(Float32(data=rad))
                     self.get_logger().info(
-                        f'Turning {rel_bear:.1f}° to face WP{self.current_wp}')
-                    self.last_action_time = self.get_clock().now()
+                        f'Turning {rel_bear:.1f}° (exp: {self.expected_turn_duration:.1f}s) to WP{self.current_wp}')
                 else:
                     self.state = STATE.DRIVING
                     self.dist_pub.publish(Float32(data=dist))
@@ -164,20 +220,32 @@ class ControlNode(Node):
             elif current_state == STATE.TURNING:
                 elapsed = (self.get_clock().now() -
                            self.last_action_time).nanoseconds / 1e9
-                if elapsed > 0.5:
-                    heading_err = (
-                        (self.angle - self.target_heading + 180) % 360) - 180
-                    if abs(heading_err) <= ANGLE_MARGIN:
-                        self.state = STATE.DRIVING
-                        self.dist_pub.publish(Float32(data=dist))
-                        self.get_logger().info(
-                            f'Aligned to WP{self.current_wp}')
-                        self.last_action_time = self.get_clock().now()
-                else:
-                    # Update turn command with latest relative bearing
-                    new_rel = ((abs_bear - self.angle + 180) % 360) - 180
-                    rad = -math.radians(new_rel)
+                heading_err = (
+                    (self.angle - self.target_heading + 180) % 360) - 180
+
+                # Recalculate bearing during turn
+                new_dist, new_abs_bear, new_rel_bear = self.get_relative(
+                    self.current_lat, self.current_lon,
+                    WAY_POINTS[self.current_wp][0],
+                    WAY_POINTS[self.current_wp][1],
+                    self.angle
+                )
+
+                # Update turn command if needed
+                if abs(new_rel_bear) > ANGLE_MARGIN:
+                    rad = -math.radians(new_rel_bear)
                     self.angle_pub.publish(Float32(data=rad))
+
+                # Completion check (time + heading)
+                if elapsed > self.expected_turn_duration and abs(heading_err) <= ANGLE_MARGIN:
+                    self.state = STATE.DRIVING
+                    self.dist_pub.publish(Float32(data=new_dist))
+                    self.get_logger().info(
+                        f'Completed turn to {self.target_heading:.1f}°')
+                elif elapsed > self.expected_turn_duration * 1.5:  # Safety timeout
+                    self.get_logger().warning(f'Turn timeout, proceeding anyway')
+                    self.state = STATE.DRIVING
+                    self.dist_pub.publish(Float32(data=new_dist))
 
             elif current_state == STATE.DRIVING:
                 elapsed = (self.get_clock().now() -

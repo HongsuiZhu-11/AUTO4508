@@ -18,7 +18,7 @@ class SimControllerSimplified : public rclcpp::Node {
 		// Configure speeds and time factor
 		linear_speed_ = 0.5; // m/s
 		angular_speed_ = 1.0; // rad/s
-		time_factor_ = 1.2;
+		time_factor_ = 1.5;
 
 		// Subscriptions
 		distance_sub_ = create_subscription<std_msgs::msg::Float32>(
@@ -26,13 +26,14 @@ class SimControllerSimplified : public rclcpp::Node {
 			[this](const std_msgs::msg::Float32::SharedPtr msg) {
 				std::lock_guard<std::mutex> lock(
 					command_mutex_);
-				if (!current_drive_active_) {
+				if (!current_drive_active_ &&
+				    !current_turn_active_) {
 					float distance = msg->data;
 					drive_duration_ = std::chrono::duration_cast<
 						std::chrono::milliseconds>(
 						std::chrono::duration<float>(
-							std::abs(distance) /
-							linear_speed_ *
+							(std::abs(distance) /
+							 linear_speed_) *
 							time_factor_));
 					drive_start_ = this->now();
 					current_drive_active_ = true;
@@ -47,13 +48,14 @@ class SimControllerSimplified : public rclcpp::Node {
 			[this](const std_msgs::msg::Float32::SharedPtr msg) {
 				std::lock_guard<std::mutex> lock(
 					command_mutex_);
-				if (!current_turn_active_) {
+				if (!current_turn_active_ &&
+				    !current_drive_active_) {
 					float angle = msg->data;
 					turn_duration_ = std::chrono::duration_cast<
 						std::chrono::milliseconds>(
 						std::chrono::duration<float>(
-							std::abs(angle) /
-							angular_speed_ *
+							(std::abs(angle) /
+							 angular_speed_) *
 							time_factor_));
 					turn_start_ = this->now();
 					current_turn_active_ = true;
