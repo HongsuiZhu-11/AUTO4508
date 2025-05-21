@@ -1,12 +1,3 @@
 [submodule "sick_scan_xd"]
 	path = sick_scan_xd
 	url = https://github.com/SICKAG/sick_scan_xd.git
-[submodule "AriaCoda"]
-	path = AriaCoda
-	url = file:///home/timon-l/devel/auto4508/project/AriaCoda
-[submodule "src/gazebo_ws"]
-	path = src/gazebo_ws
-	url = file:///home/timon-l/devel/auto4508/project/gazebo_ws/
-[submodule "src/gz-msgs"]
-	path = src/gz-msgs
-	url = file:///home/timon-l/devel/auto4508/project/gz-msgs/
