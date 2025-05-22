@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import math
-from enum import Enum
 import threading
+from enum import Enum
 
 import rclpy
 from rclpy.node import Node
@@ -25,16 +25,16 @@ LIDAR_STOP_DISTANCE = 1.0  # meters
 
 
 class DRIVE_MODE(Enum):
-    NONE = 0
-    AUTO = 1
-    MANUAL = 2
+    NONE = 1000
+    AUTO = 1001
+    MANUAL = 1002
+    PENDING = 1003
 
 
-class STATE(Enum):
-    IDLE = 0
-    TURNING = 1
-    DRIVING = 2
-    REACHED = 3
+class FOLLOW_MODE(Enum):
+    NONE = 3000
+    FOLLOWING = 3001
+    FINDING = 3002
 
 
 class LidarScan:
@@ -71,210 +71,160 @@ class ControlNode(Node):
         self.create_subscription(NavSatFix, 'fix', self.gps_cb, 10)
         self.create_subscription(Odometry, 'odom', self.odom_cb, 10)
 
-        # Protected state
+        # State
         with self.mutex:
             self.drive_mode = DRIVE_MODE.AUTO
-            self.state = STATE.IDLE
+            self.follow_mode = FOLLOW_MODE.FINDING
             self.current_wp = 0
             self.angle = 0.0
             self.current_lat = None
             self.current_lon = None
-            self.target_heading = None
             self.angular_speed = 2.0
             self.time_factor = 1.15
-            self.last_action_time = 0
+            # Add angle tracking variables
+            self.initial_angle = None
+            self.target_rel_angle = 0.0
 
         self.lidar = LidarScan()
         self.trigger = False
         self.last_linear = 0.0
         self.last_angular = 0.0
 
-        # Timers
-        self.create_timer(0.25, self.heartbeat_cb)
-        self.create_timer(0.1, self.control_loop)
+        # Tuning
+        self.turn_speed = 0.5
+        self.forward_speed = 0.3
+        self.distance_tolerance = DEST_MARGIN
+        self.turn_tolerance = ANGLE_MARGIN
 
-    def odom_cb(self, msg: Odometry):
-        ori = msg.pose.pose.orientation
-        _, _, yaw = euler_from_quaternion([ori.x, ori.y, ori.z, ori.w])
-        yaw_deg = math.degrees(yaw)
-        with self.mutex:
-            self.angle = (90 - yaw_deg) % 360
+        # Timer
+        self.create_timer(0.25, self.heartbeat_cb)
 
     def lidar_cb(self, msg: LaserScan):
         self.lidar.update(msg)
         if self.lidar.min_distance() < LIDAR_STOP_DISTANCE:
             self.publish_twist(0.0, 0.0)
 
-    def gps_cb(self, msg: NavSatFix):
-        with self.mutex:
-            self.current_lat = msg.latitude
-            self.current_lon = msg.longitude
-
     def joy_cb(self, msg: Joy):
         with self.mutex:
-            # --- Mode Switching ---
-            # Button 'X' (msg.buttons[0]) enables AUTO mode
-            if msg.buttons[0]:  # X button (PS4) / A button (Xbox)
+            # --- Mode switching ---
+            if msg.buttons[0]:  # X (PS4)
                 if self.drive_mode != DRIVE_MODE.AUTO:
-                    self.get_logger().info('Switching to AUTO mode.')
+                    self.get_logger().info("Switching to AUTO mode")
                     self.drive_mode = DRIVE_MODE.AUTO
-                    self.state = STATE.IDLE
                     self.current_wp = 0
+                    self.follow_mode = FOLLOW_MODE.FINDING
                     self.publish_twist(0.0, 0.0)
 
-            # Button 'O' (msg.buttons[1]) enables MANUAL mode
-            elif msg.buttons[1]:  # O button (PS4) / B button (Xbox)
+            elif msg.buttons[1]:  # Circle (PS4)
                 if self.drive_mode != DRIVE_MODE.MANUAL:
-                    self.get_logger().info('Switching to MANUAL mode.')
+                    self.get_logger().info("Switching to MANUAL mode")
                     self.drive_mode = DRIVE_MODE.MANUAL
-                    self.state = STATE.IDLE
                     self.publish_twist(0.0, 0.0)
 
-            # --- Dead-Man Switch ---
-            # Use L1 button (msg.buttons[4]) as deadman switch
-            dead_man_engaged = msg.buttons[4]  # L1 button (PS4) / LB button (Xbox)
+            # --- Deadman (R2/L2) ---
+            # R2 trigger (fully pressed ~ -1.0)
+            deadman_pressed = msg.axes[5] < - \
+                0.9 if len(msg.axes) > 5 else False
 
-            # Emergency stop if deadman released
-            if not dead_man_engaged:
-                if self.trigger:  # Only publish stop once
+            if not deadman_pressed:
+                if self.trigger:
                     self.publish_twist(0.0, 0.0)
-                    self.get_logger().warn('Deadman released! Emergency stop.')
+                    self.get_logger().warn("Deadman released! Stopping.")
                 self.trigger = False
                 return
 
             self.trigger = True
 
-            # --- Manual Control ---
+            # --- Manual control ---
             if self.drive_mode == DRIVE_MODE.MANUAL:
-                # Standard teleop_twist_joy configuration:
-                # Left stick vertical (axes[1]) for linear velocity
-                # Right stick horizontal (axes[3]) for angular velocity
+                lin_input = msg.axes[1]  # Left stick vertical
+                ang_input = msg.axes[3]  # Right stick horizontal
 
-                # Apply cubic scaling for finer control
-                linear_raw = msg.axes[1]
-                angular_raw = msg.axes[3]
+                # Cubic scaling for finer control
+                linear = -(lin_input ** 3) * 0.8
+                angular = -(ang_input ** 3) * 1.5
 
-                # Invert axes if needed and apply scaling
-                linear_vel = -(linear_raw ** 3) * 0.8  # Max 0.8 m/s
-                angular_vel = -(angular_raw ** 3) * 1.5  # Max 1.5 rad/s
+                # Ramping
+                if abs(linear - self.last_linear) > 0.1:
+                    linear = self.last_linear + \
+                        math.copysign(0.1, linear - self.last_linear)
+                if abs(angular - self.last_angular) > 0.15:
+                    angular = self.last_angular + \
+                        math.copysign(0.15, angular - self.last_angular)
 
-                # Apply smooth ramping
-                if abs(linear_vel - self.last_linear) > 0.1:
-                    linear_vel = self.last_linear + \
-                        math.copysign(0.1, linear_vel - self.last_linear)
-                if abs(angular_vel - self.last_angular) > 0.15:
-                    angular_vel = self.last_angular + \
-                        math.copysign(0.15, angular_vel - self.last_angular)
+                self.last_linear = linear
+                self.last_angular = angular
 
-                self.last_linear = linear_vel
-                self.last_angular = angular_vel
+                self.publish_twist(linear, angular)
 
-                self.publish_twist(linear_vel, angular_vel)
+    def odom_cb(self, msg: Odometry):
+        ori = msg.pose.pose.orientation
+        _, _, yaw = euler_from_quaternion([ori.x, ori.y, ori.z, ori.w])
+        yaw_deg = math.degrees(yaw)
+        with self.mutex:
+            current_angle = (90 - yaw_deg) % 360
+            # Update angle tracking
+            if self.drive_mode == DRIVE_MODE.AUTO and self.follow_mode == FOLLOW_MODE.FINDING:
+                if self.initial_angle is not None:
+                    # Calculate angle difference
+                    delta = current_angle - self.initial_angle
+                    # Normalize to [-180, 180]
+                    delta = (delta + 180) % 360 - 180
 
-    def publish_twist(self, lin: float, ang: float):
-        t = Twist()
-        t.linear.x = lin
-        t.angular.z = ang
-        self.cmd_pub.publish(t)
+                    # Check if we've turned enough
+                    if abs(delta - self.target_rel_angle) <= self.turn_tolerance:
+                        self.get_logger().info("Target angle reached. Switching to FOLLOWING.")
+                        self.follow_mode = FOLLOW_MODE.FOLLOWING
+                        self.initial_angle = None
+                        self.publish_twist(0.0, 0.0)
+            self.angle = current_angle
 
-    def control_loop(self):
+    def gps_cb(self, msg: NavSatFix):
+        self.current_lat = msg.latitude
+        self.current_lon = msg.longitude
+
         with self.mutex:
             if self.drive_mode != DRIVE_MODE.AUTO:
                 return
 
-            if self.state == STATE.REACHED or self.current_wp >= len(WAY_POINTS):
+            if self.current_wp >= len(WAY_POINTS):
+                self.get_logger().info("All waypoints completed.")
+                self.publish_twist(0.0, 0.0)
                 return
 
-            if self.current_lat is None or self.current_lon is None:
-                return
+            wp_lat, wp_lon = WAY_POINTS[self.current_wp]
+            dist, bearing, rel_angle = self.get_relative(
+                self.current_lat, self.current_lon, wp_lat, wp_lon, self.angle)
 
-            current_state = self.state
-            tgt_lat, tgt_lon = WAY_POINTS[self.current_wp]
-            angle = self.angle
-            current_lat = self.current_lat
-            current_lon = self.current_lon
+            self.get_logger().info(
+                f"Current:lat.{self.current_lat},lon.{self.current_lon}, Target:lat.{wp_lat},lon.{wp_lon}")
 
-        dist, abs_bear, rel_bear = self.get_relative(
-            current_lat, current_lon, tgt_lat, tgt_lon, angle
-        )
-
-        with self.mutex:
-            if current_state == STATE.IDLE:
-                if abs(rel_bear) > ANGLE_MARGIN:
-                    self.state = STATE.TURNING
-                    self.target_heading = abs_bear % 360
-                    self.expected_turn_duration = abs(math.radians(
-                        rel_bear)) / self.angular_speed * self.time_factor
-                    self.last_action_time = self.get_clock().now()
-                    rad = -math.radians(rel_bear)
-                    self.angle_pub.publish(Float32(data=rad))
+            if self.follow_mode == FOLLOW_MODE.FINDING:
+                if self.initial_angle is None:
+                    # Initialize turn
+                    self.initial_angle = self.angle
+                    self.target_rel_angle = rel_angle
+                    turn_dir = -self.turn_speed if rel_angle > 0 else self.turn_speed
+                    self.publish_twist(0.0, turn_dir)
                     self.get_logger().info(
-                        f'Turning {rel_bear:.1f}° (exp: {self.expected_turn_duration:.1f}s) to WP{self.current_wp}')
-                else:
-                    self.state = STATE.DRIVING
-                    self.dist_pub.publish(Float32(data=dist))
-                    self.get_logger().info(
-                        f'Driving {dist:.1f}m to WP{self.current_wp}')
-                    self.last_action_time = self.get_clock().now()
+                        f"Starting turn: {rel_angle:.1f} degrees")
 
-            elif current_state == STATE.TURNING:
-                elapsed = (self.get_clock().now() -
-                           self.last_action_time).nanoseconds / 1e9
-                heading_err = (
-                    (self.angle - self.target_heading + 180) % 360) - 180
-
-                # Recalculate bearing during turn
-                new_dist, new_abs_bear, new_rel_bear = self.get_relative(
-                    self.current_lat, self.current_lon,
-                    WAY_POINTS[self.current_wp][0],
-                    WAY_POINTS[self.current_wp][1],
-                    self.angle
-                )
-
-                # Update turn command if needed
-                if abs(new_rel_bear) > ANGLE_MARGIN:
-                    rad = -math.radians(new_rel_bear)
-                    self.angle_pub.publish(Float32(data=rad))
-
-                # Completion check (time + heading)
-                if elapsed > self.expected_turn_duration and abs(heading_err) <= ANGLE_MARGIN:
-                    self.state = STATE.DRIVING
-                    self.dist_pub.publish(Float32(data=new_dist))
-                    self.get_logger().info(
-                        f'Completed turn to {self.target_heading:.1f}°')
-                elif elapsed > self.expected_turn_duration * 1.5:  # Safety timeout
-                    self.get_logger().warning(f'Turn timeout, proceeding anyway')
-                    self.state = STATE.DRIVING
-                    self.dist_pub.publish(Float32(data=new_dist))
-
-            elif current_state == STATE.DRIVING:
-                elapsed = (self.get_clock().now() -
-                           self.last_action_time).nanoseconds / 1e9
-                if elapsed > 1.0:  # Minimum drive time before rechecking
-                    if dist <= DEST_MARGIN:
-                        self.current_wp += 1
-                        if self.current_wp >= len(WAY_POINTS):
-                            self.state = STATE.REACHED
-                            self.get_logger().info('All waypoints reached!')
-                        else:
-                            self.state = STATE.IDLE
-                            self.get_logger().info(
-                                f'Proceeding to WP{self.current_wp}')
-                    elif abs(rel_bear) > ANGLE_MARGIN:
-                        self.state = STATE.TURNING
-                        self.target_heading = abs_bear % 360
-                        rad = -math.radians(rel_bear)
-                        self.angle_pub.publish(Float32(data=rad))
-                        self.get_logger().info(
-                            f'Recalculating bearing, turning {rel_bear:.1f}°')
-                        self.last_action_time = self.get_clock().now()
+            elif self.follow_mode == FOLLOW_MODE.FOLLOWING:
+                if dist < self.distance_tolerance:
+                    self.get_logger().info("Waypoint reached.")
+                    self.current_wp += 1
+                    if self.current_wp < len(WAY_POINTS):
+                        self.follow_mode = FOLLOW_MODE.FINDING
+                        self.initial_angle = None  # Reset for next waypoint
+                        self.get_logger().info("Next waypoint set. Turning to align.")
                     else:
-                        # Continue driving with updated distance
-                        self.dist_pub.publish(Float32(data=dist))
-                        self.last_action_time = self.get_clock().now()
+                        self.get_logger().info("Final waypoint reached.")
+                        self.publish_twist(0.0, 0.0)
+                        self.drive_mode = DRIVE_MODE.NONE
+                else:
+                    self.publish_twist(self.forward_speed, 0.0)
 
     def get_relative(self, lat1, lon1, lat2, lon2, current_heading):
-        # Same implementation as before
         R = 6371000.0
         r1, r2 = math.radians(lat1), math.radians(lat2)
         dlon = math.radians(lon2 - lon1)
@@ -289,6 +239,12 @@ class ControlNode(Node):
         dist = 2 * R * math.atan2(math.sqrt(a), math.sqrt(1 - a))
         return dist, bearing, rel
 
+    def publish_twist(self, lin: float, ang: float):
+        t = Twist()
+        t.linear.x = lin
+        t.angular.z = ang
+        self.cmd_pub.publish(t)
+
     def heartbeat_cb(self):
         hb = Int32(data=1 if self.trigger else 0)
         self.heartbeat_pub.publish(hb)
@@ -296,6 +252,5 @@ class ControlNode(Node):
 
 def main():
     rclpy.init()
-    node = ControlNode()
-    rclpy.spin(node)
+    rclpy.spin(ControlNode())
     rclpy.shutdown()
