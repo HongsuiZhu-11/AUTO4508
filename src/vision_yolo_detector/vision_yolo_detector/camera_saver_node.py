@@ -20,7 +20,7 @@ class CameraSaver(Node):
         os.makedirs(self.save_dir_objects, exist_ok=True)
 
         self.previous_object_label = None
-        self.saved_digit_labels = set()  # ✅ use runtime cache instead of scanning folder
+        self.saved_digit_labels = set()
 
         self.latest_detections = {
             'digit': None,
@@ -64,8 +64,14 @@ class CameraSaver(Node):
     def check_digit(self):
         detection = self.latest_detections['digit']
         frame = self.latest_images['digit']
-        if not detection or frame is None or 'No' in detection:
+        if not detection:
+            self.get_logger().info("⏳ No digit detection data.")
             return
+        if frame is None:
+            self.get_logger().warn("🚫 Frame is None — image not received or too late")
+            return
+
+        self.get_logger().info(f"✅ Entered check_digit with detection: {detection}")
 
         for entry in detection.split('|'):
             parts = re.split(r'[,:= ]+', entry.strip())
@@ -74,14 +80,19 @@ class CameraSaver(Node):
             label = parts[0]
             offset = int(parts[2])
 
+            self.get_logger().info(f"🔍 Processing label={label}, offset={offset}")
+
             if label in self.saved_digit_labels:
+                self.get_logger().info(f"⏩ Already saved digit: {label}")
                 continue
 
             if abs(offset) > 50:
+                self.get_logger().info(f"📐 Skipping {label}: offset too large ({offset})")
                 self.align_pub.publish(String(data=f"digit:{label}:offset={offset}"))
                 self.status_pub.publish(String(data=f"digit:{label} not centered"))
                 continue
 
+            self.get_logger().info(f"💾 Saving digit {label} at offset {offset}")
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path = os.path.join(self.save_dir_digits, f"{label}_{timestamp}.jpg")
             cv2.imwrite(save_path, frame)
