@@ -8,6 +8,7 @@ import cv2
 import os
 from datetime import datetime
 import re
+from collections import defaultdict
 
 class CameraSaver(Node):
     def __init__(self):
@@ -31,6 +32,9 @@ class CameraSaver(Node):
             'object': None
         }
         self.latest_lidar_ranges = []
+
+        self.detection_counts = defaultdict(int)  # ✅ track repeated detections
+        self.required_count = 3  # ✅ require 3 consecutive detections to trigger save
 
         self.create_subscription(String, '/digit_detected', self.digit_detected_callback, 10)
         self.create_subscription(Image, '/digit_annotated/image_raw', self.digit_image_callback, 10)
@@ -96,11 +100,18 @@ class CameraSaver(Node):
                 self.status_pub.publish(String(data=f"digit:{label} not centered"))
                 continue
 
+            self.detection_counts[label] += 1
+            self.get_logger().info(f"🧮 Detection count for {label}: {self.detection_counts[label]}")
+
+            if self.detection_counts[label] < self.required_count:
+                continue
+
             self.get_logger().info(f"💾 Saving digit {label} at offset {offset}")
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path = os.path.join(self.save_dir_digits, f"{label}_{timestamp}.jpg")
             cv2.imwrite(save_path, frame)
             self.saved_digit_labels.add(label)
+            self.detection_counts[label] = 0
             self.status_pub.publish(String(data=f"📸 Saved digit:{label}"))
             self.saved_pub.publish(String(data=save_path))
             self.get_logger().info(f"✅ Saved digit {label} at {save_path}")
@@ -140,10 +151,17 @@ class CameraSaver(Node):
                 self.status_pub.publish(String(data=f"object:{label} not centered"))
                 continue
 
+            self.detection_counts[label] += 1
+            self.get_logger().info(f"🧮 Detection count for {label}: {self.detection_counts[label]}")
+
+            if self.detection_counts[label] < self.required_count:
+                continue
+
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path = os.path.join(self.save_dir_objects, f"{label}_{timestamp}.jpg")
             cv2.imwrite(save_path, frame)
             self.previous_object_label = label
+            self.detection_counts[label] = 0
             self.status_pub.publish(String(data=f"📸 Saved object:{label}"))
             self.saved_pub.publish(String(data=save_path))
             self.get_logger().info(f"✅ Saved object {label} at {save_path}")
