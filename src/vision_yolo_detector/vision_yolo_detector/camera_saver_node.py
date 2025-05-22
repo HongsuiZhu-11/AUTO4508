@@ -1,7 +1,8 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
-from std_msgs.msg import Float32MultiArray, String
+from std_msgs.msg import String
+from std_msgs.msg import Float32MultiArray
 from cv_bridge import CvBridge
 import cv2
 import os
@@ -19,6 +20,7 @@ class CameraSaver(Node):
         os.makedirs(self.save_dir_objects, exist_ok=True)
 
         self.previous_object_label = None
+        self.saved_digit_labels = set()  # ✅ use runtime cache instead of scanning folder
 
         self.latest_detections = {
             'digit': None,
@@ -65,10 +67,6 @@ class CameraSaver(Node):
         if not detection or frame is None or 'No' in detection:
             return
 
-        # Get existing labels in saved directory
-        existing_files = os.listdir(self.save_dir_digits)
-        existing_labels = {f.split('_')[0] for f in existing_files if f.endswith('.jpg')}
-
         for entry in detection.split('|'):
             parts = re.split(r'[,:= ]+', entry.strip())
             if len(parts) < 4:
@@ -76,7 +74,7 @@ class CameraSaver(Node):
             label = parts[0]
             offset = int(parts[2])
 
-            if label in existing_labels:
+            if label in self.saved_digit_labels:
                 continue
 
             if abs(offset) > 50:
@@ -87,6 +85,7 @@ class CameraSaver(Node):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             save_path = os.path.join(self.save_dir_digits, f"{label}_{timestamp}.jpg")
             cv2.imwrite(save_path, frame)
+            self.saved_digit_labels.add(label)
             self.status_pub.publish(String(data=f"📸 Saved digit:{label}"))
             self.saved_pub.publish(String(data=save_path))
             self.get_logger().info(f"✅ Saved digit {label} at {save_path}")
