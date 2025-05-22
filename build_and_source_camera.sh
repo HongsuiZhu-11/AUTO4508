@@ -1,25 +1,31 @@
 #!/bin/bash
 
-# Navigate to your ROS2 workspace
-# cd /home/team10/AUTO4508 || { echo "❌ AUTO4508 workspace not found!"; exit 1; }
+# 安装依赖
+echo "🔧 Updating system and installing dependencies..."
+sudo apt update && sudo apt install -y python3-pip python3-colcon-common-extensions
 
-# Build only the specified packages
+echo "📦 Installing Python packages..."
+pip install --upgrade pip
+pip install ultralytics depthai opencv-python numpy
+
+# 进入工作区
+# WORKSPACE_DIR="/home/team10/AUTO4508"
+# cd "$WORKSPACE_DIR" || { echo "❌ Cannot find workspace: $WORKSPACE_DIR"; exit 1; }
+
+# 构建指定包
 echo "🔨 Building vision_oak_publisher and vision_yolo_detector..."
 colcon build --packages-select vision_oak_publisher vision_yolo_detector
 
-# Source the setup file
-echo "✅ Sourcing install/setup.bash..."
+# Source 环境变量
+echo "✅ Sourcing setup file..."
 source install/setup.bash
 
-echo "🎉 Build and environment setup complete."
+# 并行启动四个节点
+echo "🚀 Launching all four camera-related nodes..."
 
-# ros2 run vision_oak_publisher oak_camera_publisher
-# ros2 run vision_yolo_detector detect_node
-# Uncomment the above lines to run the nodes after sourcing
-# Note: Make sure to run this script in a terminal that has the necessary permissions
+gnome-terminal -- bash -c "source install/setup.bash && ros2 run vision_oak_publisher oak_camera_publisher; exec bash" &
+gnome-terminal -- bash -c "source install/setup.bash && ros2 run vision_yolo_detector detect_node; exec bash" &
+gnome-terminal -- bash -c "source install/setup.bash && ros2 run vision_yolo_detector digit_node; exec bash" &
+gnome-terminal -- bash -c "source install/setup.bash && ros2 run vision_yolo_detector camera_saver_node; exec bash" &
 
-
-# sudo apt update
-# sudo apt install -y python3-pip
-# pip install --break ultralytics depthai
-# these are the packages that are needed to run the code, you need to run these in terminal before everything
+echo "🎉 All nodes started in separate terminals."
