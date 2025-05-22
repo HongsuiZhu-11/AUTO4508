@@ -74,11 +74,15 @@ class CameraSaver(Node):
         self.get_logger().info(f"✅ Entered check_digit with detection: {detection}")
 
         for entry in detection.split('|'):
-            parts = re.split(r'[,:= ]+', entry.strip())
-            if len(parts) < 4:
+            entry = entry.strip()
+            if not entry or 'offset=' not in entry:
                 continue
-            label = parts[0]
-            offset = int(parts[2])
+            try:
+                label = entry.split(',')[0].strip()
+                offset = int(entry.split('offset=')[-1].strip())
+            except Exception as e:
+                self.get_logger().warn(f"❌ Failed to parse digit entry: {entry} ({e})")
+                continue
 
             self.get_logger().info(f"🔍 Processing label={label}, offset={offset}")
 
@@ -112,29 +116,37 @@ class CameraSaver(Node):
                 self.previous_object_label = None
             return
 
-        entry = detection.split('|')[0].strip()
-        parts = re.split(r'[,:= ]+', entry)
-        if len(parts) < 4:
-            return
+        self.get_logger().info(f"✅ Entered check_object with detection: {detection}")
 
-        label = parts[0]
-        offset = int(parts[2])
+        for entry in detection.split('|'):
+            entry = entry.strip()
+            if not entry or 'offset=' not in entry:
+                continue
+            try:
+                label = entry.split(',')[0].strip()
+                offset = int(entry.split('offset=')[-1].strip())
+            except Exception as e:
+                self.get_logger().warn(f"❌ Failed to parse object entry: {entry} ({e})")
+                continue
 
-        if label == self.previous_object_label:
-            return
+            self.get_logger().info(f"🔍 Processing label={label}, offset={offset}")
 
-        if abs(offset) > 50:
-            self.align_pub.publish(String(data=f"object:{label}:offset={offset}"))
-            self.status_pub.publish(String(data=f"object:{label} not centered"))
-            return
+            if label == self.previous_object_label:
+                continue
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        save_path = os.path.join(self.save_dir_objects, f"{label}_{timestamp}.jpg")
-        cv2.imwrite(save_path, frame)
-        self.previous_object_label = label
-        self.status_pub.publish(String(data=f"📸 Saved object:{label}"))
-        self.saved_pub.publish(String(data=save_path))
-        self.get_logger().info(f"✅ Saved object {label} at {save_path}")
+            if abs(offset) > 50:
+                self.get_logger().info(f"📐 Skipping {label}: offset too large ({offset})")
+                self.align_pub.publish(String(data=f"object:{label}:offset={offset}"))
+                self.status_pub.publish(String(data=f"object:{label} not centered"))
+                continue
+
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            save_path = os.path.join(self.save_dir_objects, f"{label}_{timestamp}.jpg")
+            cv2.imwrite(save_path, frame)
+            self.previous_object_label = label
+            self.status_pub.publish(String(data=f"📸 Saved object:{label}"))
+            self.saved_pub.publish(String(data=save_path))
+            self.get_logger().info(f"✅ Saved object {label} at {save_path}")
 
 def main(args=None):
     rclpy.init(args=args)

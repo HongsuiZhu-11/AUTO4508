@@ -16,7 +16,6 @@ class YoloCenterDetector(Node):
 
         # Subscriptions
         self.rgb_sub = self.create_subscription(Image, '/camera/image_raw', self.image_callback, 10)
-        self.depth_sub = self.create_subscription(Image, '/camera/depth/image_raw', self.depth_callback, 10)
 
         # Publishers
         self.publisher_ = self.create_publisher(String, '/target_detected', 10)
@@ -27,18 +26,13 @@ class YoloCenterDetector(Node):
         self.model = YOLO(model_path)
         self.all_classes = set(self.model.names.values())
 
-        self.latest_depth = None
-
-        self.get_logger().info("✅ YOLO center detector initialized (detection only).")
+        self.get_logger().info("✅ YOLO center detector initialized (no depth).")
 
     def get_color_for_class(self, label):
         h = hash(label) % 180
         hsv_color = np.uint8([[[h, 255, 255]]])
         bgr_color = cv2.cvtColor(hsv_color, cv2.COLOR_HSV2BGR)[0][0]
         return tuple(int(c) for c in bgr_color)
-
-    def depth_callback(self, msg):
-        self.latest_depth = self.bridge.imgmsg_to_cv2(msg, desired_encoding="16UC1")
 
     def image_callback(self, msg):
         frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
@@ -56,11 +50,7 @@ class YoloCenterDetector(Node):
             cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
             offset = cx - center_x
 
-            depth = -1
-            if self.latest_depth is not None and 0 <= cy < self.latest_depth.shape[0] and 0 <= cx < self.latest_depth.shape[1]:
-                depth = int(self.latest_depth[cy, cx])
-
-            detections.append(f"{label}, offset={offset}, depth_mm={depth}")
+            detections.append(f"{label}, offset={offset}")
 
             color = self.get_color_for_class(label)
             cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
