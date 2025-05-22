@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
-from std_msgs.msg import Float32MultiArray  # 用于模拟 LiDAR 前方 30° 的距离数据
+from std_msgs.msg import Float32MultiArray
 from cv_bridge import CvBridge
 import cv2
 import os
@@ -19,7 +19,9 @@ class CameraSaver(Node):
         os.makedirs(self.save_dir_digits, exist_ok=True)
         os.makedirs(self.save_dir_objects, exist_ok=True)
 
-        self.saved_labels = set()
+        self.saved_digit_labels = set()
+        self.previous_object_label = None
+
         self.latest_detections = {
             'digit': None,
             'object': None
@@ -30,30 +32,28 @@ class CameraSaver(Node):
         }
         self.latest_lidar_ranges = []
 
-        # Subscriptions
         self.create_subscription(String, '/digit_detected', self.digit_detected_callback, 10)
         self.create_subscription(Image, '/digit_annotated/image_raw', self.digit_image_callback, 10)
         self.create_subscription(String, '/target_detected', self.object_detected_callback, 10)
         self.create_subscription(Image, '/target_annotated/image_raw', self.object_image_callback, 10)
         self.create_subscription(Float32MultiArray, '/front_lidar_range', self.lidar_callback, 10)
 
-        # Publishers
         self.status_pub = self.create_publisher(String, '/camera_status', 10)
         self.align_pub = self.create_publisher(String, '/camera_request_align', 10)
         self.saved_pub = self.create_publisher(String, '/camera_saved_image', 10)
 
-        self.get_logger().info("📸 Camera Saver Node initialized (without depth, digits & objects monitored)")
+        self.get_logger().info("📸 Camera Saver Node initialized (digit save-once, object only on change)")
 
     def lidar_callback(self, msg):
         self.latest_lidar_ranges = msg.data
 
     def digit_detected_callback(self, msg):
         self.latest_detections['digit'] = msg.data
-        self.check_and_save('digit')
+        self.check_digit()
 
     def object_detected_callback(self, msg):
         self.latest_detections['object'] = msg.data
-        self.check_and_save('object')
+        self.check_object()
 
     def digit_image_callback(self, msg):
         self.latest_images['digit'] = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
@@ -61,14 +61,11 @@ class CameraSaver(Node):
     def object_image_callback(self, msg):
         self.latest_images['object'] = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
 
-    def check_and_save(self, mode):
-        detection = self.latest_detections[mode]
-        frame = self.latest_images[mode]
-        if not detection or frame is None:
+    def check_digit(self):
+        detection = self.latest_detections['digit']
+        frame = self.latest_images['digit']
+        if not detection or frame is None or 'No' in detection:
             return
-
-        if 'No' in detection:
-            return  # No detection
 
         for entry in detection.split('|'):
             parts = re.split(r'[,:= ]+', entry.strip())
@@ -77,26 +74,51 @@ class CameraSaver(Node):
             label = parts[0]
             offset = int(parts[2])
 
-            # Skip if already saved
-            if label in self.saved_labels:
+            if label in self.saved_digit_labels:
                 continue
 
-            # Check if too far from center
             if abs(offset) > 50:
-                self.align_pub.publish(String(data=f"{mode}:{label}:offset={offset}"))
-                self.status_pub.publish(String(data=f"{mode}:{label} not centered"))
+                self.align_pub.publish(String(data=f"digit:{label}:offset={offset}"))
+                self.status_pub.publish(String(data=f"digit:{label} not centered"))
                 continue
 
-            # All good: Save image
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            save_path = os.path.join(
-                self.save_dir_digits if mode == 'digit' else self.save_dir_objects,
-                f"{label}_{timestamp}.jpg")
+            save_path = os.path.join(self.save_dir_digits, f"{label}_{timestamp}.jpg")
             cv2.imwrite(save_path, frame)
-            self.saved_labels.add(label)
-            self.status_pub.publish(String(data=f"📸 Saved {mode}:{label}"))
+            self.saved_digit_labels.add(label)
+            self.status_pub.publish(String(data=f"📸 Saved digit:{label}"))
             self.saved_pub.publish(String(data=save_path))
-            self.get_logger().info(f"✅ Saved {label} at {save_path}")
+            self.get_logger().info(f"✅ Saved digit {label} at {save_path}")
+
+    def check_object(self):
+        detection = self.latest_detections['object']
+        frame = self.latest_images['object']
+        if not detection or frame is None or 'No' in detection:
+            return
+
+        entry = detection.split('|')[0].strip()
+        parts = re.split(r'[,:= ]+', entry)
+        if len(parts) < 4:
+            return
+
+        label = parts[0]
+        offset = int(parts[2])
+
+        if label == self.previous_object_label:
+            return
+
+        if abs(offset) > 50:
+            self.align_pub.publish(String(data=f"object:{label}:offset={offset}"))
+            self.status_pub.publish(String(data=f"object:{label} not centered"))
+            return
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_path = os.path.join(self.save_dir_objects, f"{label}_{timestamp}.jpg")
+        cv2.imwrite(save_path, frame)
+        self.previous_object_label = label
+        self.status_pub.publish(String(data=f"📸 Saved object:{label}"))
+        self.saved_pub.publish(String(data=save_path))
+        self.get_logger().info(f"✅ Saved object {label} at {save_path}")
 
 def main(args=None):
     rclpy.init(args=args)
