@@ -8,7 +8,6 @@ import os
 import cv2
 import numpy as np
 import pkg_resources
-from datetime import datetime
 
 class DigitDetector(Node):
     def __init__(self):
@@ -30,18 +29,15 @@ class DigitDetector(Node):
 
         # State
         self.latest_depth = None
-        self.saved_labels = set()
-        os.makedirs("digit_detected_images", exist_ok=True)
 
-        self.get_logger().info(" Digit detector initialized (video + save-once per digit).")
+        self.get_logger().info("✅ Digit detector initialized (detection only).")
 
     def depth_callback(self, msg):
-        # Get raw mono16 depth (in mm)
         self.latest_depth = self.bridge.imgmsg_to_cv2(msg, desired_encoding="16UC1")
 
     def rgb_callback(self, msg):
         if self.latest_depth is None:
-            self.get_logger().warn(" Waiting for depth frame...")
+            self.get_logger().warn("⏳ Waiting for depth frame...")
             return
 
         frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
@@ -61,7 +57,6 @@ class DigitDetector(Node):
             cy = (y1 + y2) // 2
             offset = cx - center_x
 
-            # Read depth at center point
             depth = -1
             if 0 <= cy < self.latest_depth.shape[0] and 0 <= cx < self.latest_depth.shape[1]:
                 depth = int(self.latest_depth[cy, cx])
@@ -73,22 +68,10 @@ class DigitDetector(Node):
             cv2.putText(annotated, f"{label}", (x1, y1 - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-            # Save image for new label
-            if label not in self.saved_labels:
-                self.saved_labels.add(label)
-                filename = f"digit_detected_images/{label}_{datetime.now().strftime('%H%M%S')}.jpg"
-                cv2.imwrite(filename, annotated)
-                self.get_logger().info(f" Saved image for digit '{label}': {filename}")
-
-        # Publish detection message
-        if detections:
-            msg_out = " | ".join(detections)
-        else:
-            msg_out = "No digits detected"
+        msg_out = " | ".join(detections) if detections else "No digits detected"
         self.publisher_.publish(String(data=msg_out))
-        self.get_logger().info(f"message: {msg_out}")
+        self.get_logger().info(f"📢 {msg_out}")
 
-        # Publish annotated image
         msg_img = self.bridge.cv2_to_imgmsg(annotated, encoding='bgr8')
         self.annotated_pub.publish(msg_img)
 
