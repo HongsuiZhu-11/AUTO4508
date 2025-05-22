@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
-from std_msgs.msg import String, Float32MultiArray
+from sensor_msgs.msg import Image, String
+from std_msgs.msg import Float32MultiArray
 from cv_bridge import CvBridge
 import cv2
 import os
@@ -65,6 +65,7 @@ class CameraSaver(Node):
         if not detection or frame is None or 'No' in detection:
             return
 
+        # Get existing labels in saved directory
         existing_files = os.listdir(self.save_dir_digits)
         existing_labels = {f.split('_')[0] for f in existing_files if f.endswith('.jpg')}
 
