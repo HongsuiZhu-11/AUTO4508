@@ -2,7 +2,7 @@
 
 # 安装依赖
 echo "🔧 Updating system and installing dependencies..."
-sudo apt update && sudo apt install -y python3-pip python3-colcon-common-extensions
+sudo apt update && sudo apt install -y python3-pip python3-colcon-common-extensions tmux
 
 echo "📦 Installing Python packages..."
 # pip install --upgrade pip
