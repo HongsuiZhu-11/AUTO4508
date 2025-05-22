@@ -28,7 +28,7 @@ class CameraSaver(Node):
             'digit': None,
             'object': None
         }
-        self.latest_lidar_ranges = []  # 模拟接收前方30°激光雷达数据
+        self.latest_lidar_ranges = []
 
         # Subscriptions
         self.create_subscription(String, '/digit_detected', self.digit_detected_callback, 10)
@@ -42,7 +42,7 @@ class CameraSaver(Node):
         self.align_pub = self.create_publisher(String, '/camera_request_align', 10)
         self.saved_pub = self.create_publisher(String, '/camera_saved_image', 10)
 
-        self.get_logger().info("📸 Camera Saver Node initialized (watching digits & objects)")
+        self.get_logger().info("📸 Camera Saver Node initialized (without depth, digits & objects monitored)")
 
     def lidar_callback(self, msg):
         self.latest_lidar_ranges = msg.data
@@ -72,11 +72,10 @@ class CameraSaver(Node):
 
         for entry in detection.split('|'):
             parts = re.split(r'[,:= ]+', entry.strip())
-            if len(parts) < 6:
+            if len(parts) < 4:
                 continue
             label = parts[0]
             offset = int(parts[2])
-            depth_mm = int(parts[4])
 
             # Skip if already saved
             if label in self.saved_labels:
@@ -86,11 +85,6 @@ class CameraSaver(Node):
             if abs(offset) > 50:
                 self.align_pub.publish(String(data=f"{mode}:{label}:offset={offset}"))
                 self.status_pub.publish(String(data=f"{mode}:{label} not centered"))
-                continue
-
-            # Check if too far
-            if depth_mm > 1500 or depth_mm <= 0:
-                self.status_pub.publish(String(data=f"{mode}:{label} too far: {depth_mm}mm"))
                 continue
 
             # All good: Save image
