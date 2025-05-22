@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image, String
-from std_msgs.msg import Float32MultiArray
+from sensor_msgs.msg import Image
+from std_msgs.msg import Float32MultiArray, String
 from cv_bridge import CvBridge
 import cv2
 import os
