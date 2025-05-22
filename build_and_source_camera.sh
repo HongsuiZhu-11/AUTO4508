@@ -6,7 +6,7 @@ sudo apt update && sudo apt install -y python3-pip python3-colcon-common-extensi
 
 echo "📦 Installing Python packages..."
 pip install --upgrade pip
-pip install ultralytics depthai opencv-python numpy
+pip install ultralytics depthai opencv-python numpy --break-system-packages
 
 # 进入工作区
 # WORKSPACE_DIR="/home/team10/AUTO4508"
