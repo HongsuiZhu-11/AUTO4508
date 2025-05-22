@@ -23,14 +23,18 @@ source install/setup.bash
 SESSION="vision_nodes"
 tmux new-session -d -s $SESSION
 
-# 创建四个 pane 并运行节点
-tmux send-keys -t $SESSION "source install/setup.bash && ros2 run vision_oak_publisher oak_camera_publisher" C-m
+# Digit publisher
+tmux send-keys -t $SESSION "source install/setup.bash && RMW_IMPLEMENTATION=rmw_cyclonedds_cpp ros2 run vision_oak_publisher oak_camera_publisher" C-m
+
 tmux split-window -v -t $SESSION
-tmux send-keys -t $SESSION "source install/setup.bash && ros2 run vision_yolo_detector detect_node" C-m
+tmux send-keys -t $SESSION "source install/setup.bash && RMW_IMPLEMENTATION=rmw_cyclonedds_cpp ros2 run vision_yolo_detector detect_node" C-m
+
 tmux split-window -h -t $SESSION
-tmux send-keys -t $SESSION "source install/setup.bash && ros2 run vision_yolo_detector digit_node" C-m
+tmux send-keys -t $SESSION "source install/setup.bash && RMW_IMPLEMENTATION=rmw_cyclonedds_cpp ros2 run vision_yolo_detector digit_node" C-m
+
 tmux split-window -v -t $SESSION
-tmux send-keys -t $SESSION "source install/setup.bash && ros2 run vision_yolo_detector camera_saver_node" C-m
+tmux send-keys -t $SESSION "source install/setup.bash && RMW_IMPLEMENTATION=rmw_cyclonedds_cpp ros2 run vision_yolo_detector camera_saver_node" C-m
+
 
 # 布局并附加
 tmux select-layout -t $SESSION tiled
