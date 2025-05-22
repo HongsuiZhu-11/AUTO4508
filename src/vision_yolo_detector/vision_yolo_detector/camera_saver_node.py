@@ -1,8 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
-from std_msgs.msg import String
-from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import String, Float32MultiArray
 from cv_bridge import CvBridge
 import cv2
 import os
@@ -42,7 +41,7 @@ class CameraSaver(Node):
         self.align_pub = self.create_publisher(String, '/camera_request_align', 10)
         self.saved_pub = self.create_publisher(String, '/camera_saved_image', 10)
 
-        self.get_logger().info("📸 Camera Saver Node initialized (digit save-once, object only on change)")
+        self.get_logger().info("📸 Camera Saver Node ready.")
 
     def lidar_callback(self, msg):
         self.latest_lidar_ranges = msg.data
@@ -93,7 +92,12 @@ class CameraSaver(Node):
     def check_object(self):
         detection = self.latest_detections['object']
         frame = self.latest_images['object']
-        if not detection or frame is None or 'No' in detection:
+        if frame is None:
+            return
+
+        if not detection or 'No' in detection:
+            if self.previous_object_label is not None:
+                self.previous_object_label = None
             return
 
         entry = detection.split('|')[0].strip()
