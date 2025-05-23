@@ -26,11 +26,14 @@ tmux new-session -d -s $SESSION
 # Digit publisher
 tmux send-keys -t $SESSION "source install/setup.bash && RMW_IMPLEMENTATION=rmw_cyclonedds_cpp ros2 run vision_oak_publisher oak_camera_publisher" C-m
 
-tmux split-window -v -t $SESSION
-tmux send-keys -t $SESSION "source install/setup.bash && RMW_IMPLEMENTATION=rmw_cyclonedds_cpp ros2 run vision_yolo_detector detect_node" C-m
+# tmux split-window -v -t $SESSION
+# tmux send-keys -t $SESSION "source install/setup.bash && RMW_IMPLEMENTATION=rmw_cyclonedds_cpp ros2 run vision_yolo_detector detect_node" C-m
+
+# tmux split-window -h -t $SESSION
+# tmux send-keys -t $SESSION "source install/setup.bash && RMW_IMPLEMENTATION=rmw_cyclonedds_cpp ros2 run vision_yolo_detector digit_node" C-m
 
 tmux split-window -h -t $SESSION
-tmux send-keys -t $SESSION "source install/setup.bash && RMW_IMPLEMENTATION=rmw_cyclonedds_cpp ros2 run vision_yolo_detector digit_node" C-m
+tmux send-keys -t $SESSION "source install/setup.bash && RMW_IMPLEMENTATION=rmw_cyclonedds_cpp ros2 run vision_yolo_detector unified_detector_node" C-m
 
 tmux split-window -v -t $SESSION
 tmux send-keys -t $SESSION "source install/setup.bash && RMW_IMPLEMENTATION=rmw_cyclonedds_cpp ros2 run vision_yolo_detector camera_saver_node" C-m
