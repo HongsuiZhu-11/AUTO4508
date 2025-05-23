@@ -83,58 +83,59 @@ class ControlNode(Node):
 
         
     def joy_cb(self, msg: Joy):
-        if msg.buttons[0]:  # X (PS4)
-            if self.drive_mode != DRIVE_MODE.AUTO:
-                self.get_logger().info("Switching to AUTO mode")
-                self.drive_mode = DRIVE_MODE.AUTO
-                self.current_wp = 0
-                self.auto_mode = True
-                self.publish_twist(0.7, 0.0)
+        with self.mutex:
+            if msg.buttons[0]:  # X (PS4)
+                if self.drive_mode != DRIVE_MODE.AUTO:
+                    self.get_logger().info("Switching to AUTO mode")
+                    self.drive_mode = DRIVE_MODE.AUTO
+                    self.current_wp = 0
+                    self.auto_mode = True
+                    self.publish_twist(0.7, 0.0)
 
-        elif msg.buttons[1]:  # Circle (PS4)
-            if self.drive_mode != DRIVE_MODE.MANUAL:
-                self.get_logger().info("Switching to MANUAL mode")
-                self.drive_mode = DRIVE_MODE.MANUAL
+            elif msg.buttons[1]:  # Circle (PS4)
+                if self.drive_mode != DRIVE_MODE.MANUAL:
+                    self.get_logger().info("Switching to MANUAL mode")
+                    self.drive_mode = DRIVE_MODE.MANUAL
+                    self.auto_mode = False
+                    self.publish_twist(0.0, 0.0)
+
+            # --- Deadman (R2/L2) ---
+            # R2 trigger (fully pressed ~ -1.0)
+            deadman_pressed = msg.axes[5] < - \
+                0.9 if len(msg.axes) > 5 else False
+
+            if not deadman_pressed:
+                if self.trigger:
+                    self.publish_twist(0.0, 0.0)
+                    self.get_logger().warn("Deadman released! Stopping.")
+                self.trigger = False
+                self.drive_mode = DRIVE_MODE.NONE
                 self.auto_mode = False
-                self.publish_twist(0.0, 0.0)
+                return
 
-        # --- Deadman (R2/L2) ---
-        # R2 trigger (fully pressed ~ -1.0)
-        deadman_pressed = msg.axes[5] < - \
-            0.9 if len(msg.axes) > 5 else False
+            self.trigger = True
 
-        if not deadman_pressed:
-            if self.trigger:
-                self.publish_twist(0.0, 0.0)
-                self.get_logger().warn("Deadman released! Stopping.")
-            self.trigger = False
-            self.drive_mode = DRIVE_MODE.NONE
-            self.auto_mode = False
-            return
+            # --- Manual control ---
+            if self.drive_mode == DRIVE_MODE.MANUAL:
+                lin_input = msg.axes[1]  # Left stick vertical
+                ang_input = msg.axes[3]  # Right stick horizontal
 
-        self.trigger = True
+                # Cubic scaling for finer control
+                linear = -(lin_input ** 3) * 0.8
+                angular = -(ang_input ** 3) * 1.5
 
-        # --- Manual control ---
-        if self.drive_mode == DRIVE_MODE.MANUAL:
-            lin_input = msg.axes[1]  # Left stick vertical
-            ang_input = msg.axes[3]  # Right stick horizontal
+                # Ramping
+                if abs(linear - self.last_linear) > 0.1:
+                    linear = self.last_linear + \
+                        math.copysign(0.1, linear - self.last_linear)
+                if abs(angular - self.last_angular) > 0.15:
+                    angular = self.last_angular + \
+                        math.copysign(0.15, angular - self.last_angular)
 
-            # Cubic scaling for finer control
-            linear = -(lin_input ** 3) * 0.8
-            angular = -(ang_input ** 3) * 1.5
+                self.last_linear = linear
+                self.last_angular = angular
 
-            # Ramping
-            if abs(linear - self.last_linear) > 0.1:
-                linear = self.last_linear + \
-                    math.copysign(0.1, linear - self.last_linear)
-            if abs(angular - self.last_angular) > 0.15:
-                angular = self.last_angular + \
-                    math.copysign(0.15, angular - self.last_angular)
-
-            self.last_linear = linear
-            self.last_angular = angular
-
-            self.publish_twist(linear, angular)
+                self.publish_twist(linear, angular)
  
     def update_odometry_timer_callback(self):
         """Calculates and publishes odometry, applying boundary checks."""
