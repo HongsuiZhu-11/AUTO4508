@@ -11,7 +11,7 @@ from sensor_msgs.msg import NavSatFix
 from std_msgs.msg import String, Float32, Int32, Float32MultiArray
 from cv_bridge import CvBridge
 
-MODES = {'live', 'image', 'lidar', 'gps'}  # Define modes for the application
+MODES = ['live', 'image', 'lidar', 'gps', 'digits']  # Define modes for the application
 
 class CameraViewer(Node):
     def __init__(self, root):
@@ -26,6 +26,9 @@ class CameraViewer(Node):
         self.lidar_sub = self.create_subscription(Float32MultiArray, "obstacle_team10", self.obstacle_cb, 10)
         # IMU
         self.imu_sub = self.create_subscription(Float32MultiArray, "imu_team10", self.imu_cb, 10)
+
+        self.digit_annotated_subscription = self.create_subscription(Image, '/digit_annotated/image_raw', self.digit_annotated_callback, 10)
+
         
         self.mode = 0  # Track whether live mode is active
         
@@ -84,6 +87,11 @@ class CameraViewer(Node):
         self.image_label = tk.Label(self.content_frame)
         self.lidar_frame = tk.Frame(self.content_frame)
         self.gps_frame = tk.Frame(self.content_frame)
+        # Digit detection frame
+        self.digit_frame = tk.Frame(self.content_frame)
+        self.digit_label = tk.Label(self.digit_frame)
+        self.digit_label.pack(expand=True, fill="both")
+
         
 
     def next_mode(self):
@@ -121,6 +129,8 @@ class CameraViewer(Node):
             self.ui_lidar_mode()
         elif self.mode == 3:
             self.ui_gps_mode()
+        elif self.mode == 4:
+            self.ui_digit_mode()
         else:
             self.get_logger().error("Invalid mode selected.")
             return
@@ -167,6 +177,13 @@ class CameraViewer(Node):
         # Title
         tk.Label(self.button_center_frame, text="GPS and IMU Data", font=("Arial", 16)).grid(row=0, column=0, rowspan=3, columnspan=3, sticky="ew")
 
+    def ui_digit_mode(self):
+        self.digit_frame.grid(row=0, column=0, rowspan=2, columnspan=2, sticky="nsew")
+        tk.Label(self.button_center_frame, text="Digit Detection Stream", font=("Arial", 16)).grid(
+            row=0, column=0, columnspan=3, rowspan=3, sticky="ew")
+
+
+
 
     def camera_annotated_callback(self, msg):
         """ Convert ROS2 Image message to OpenCV format and update Tkinter UI """
@@ -187,6 +204,23 @@ class CameraViewer(Node):
 
         self.live_label.config(image=img_tk)
         self.live_label.image = img_tk  # Prevent garbage collection
+
+    def digit_annotated_callback(self, msg):
+        if not self.mode == 4:  
+            return
+
+        frame = self.camera_annotated_bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+
+        win_width = self.digit_label.winfo_width()
+        win_height = self.digit_label.winfo_height()
+
+        img_pil = PilImage.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        img_pil.thumbnail((win_width, win_height - 60), PilImage.Resampling.LANCZOS)
+        img_tk = ImageTk.PhotoImage(img_pil)
+
+        self.digit_label.config(image=img_tk)
+        self.digit_label.image = img_tk
+
 
     def gps_cb(self, msg):
         latitude = msg.latitude
