@@ -1,0 +1,327 @@
+#!/usr/bin/env python3
+import math
+import threading
+from enum import Enum
+import random
+
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import Twist
+from nav_msgs.msg import Odometry
+from sensor_msgs.msg import Joy, LaserScan, NavSatFix
+from std_msgs.msg import Float32, Int32, Float32MultiArray
+
+
+
+
+class DRIVE_MODE(Enum):
+    NONE = 1000
+    AUTO = 1001
+    MANUAL = 1002
+    PENDING = 1003
+
+class ControlNode(Node):
+    def __init__(self):
+        print('Create ControlNode')
+        super().__init__('control_node')
+
+        self.mutex = threading.Lock()
+
+        # Publishers
+        self.cmd_pub = self.create_publisher(Twist, 'cmd_vel_team10', 10)
+        self.heartbeat_pub = self.create_publisher(
+            Int32, 'heartbeat_team10', 10)
+    
+        # Subscribers
+        self.create_subscription(Joy, 'joy', self.joy_cb, 10)
+        self.create_subscription(LaserScan, 'scan', self.lidar_cb, 10)
+        
+        # Timer
+        self.create_timer(0.1, self.timer_cb)
+        # Timer
+        self.create_timer(0.25, self.heartbeat_cb)
+
+        
+        # Variables
+        self.is_obstacle = False
+        self.minRange = 0.0
+        self.minAngle = 0.0
+        self.turning_counter = 0
+        
+        self.angle_counter = -1
+        self.step_counter = 0
+        self.is_turning = False
+        self.auto_mode = False
+        # self.publish_twist(0.7, 0.0)
+        
+        self.drive_mode = DRIVE_MODE.NONE
+        
+        
+        # ODOM
+        # --- Boundary Configuration ---
+        self.map_min_x = 0.0
+        self.map_max_x = 15.0
+        self.map_min_y = 0.0
+        self.map_max_y = 15.0
+        
+         # --- Odometry State ---
+        self.x, self.y, self.th = 0.0, 0.0, 0.0
+        self.vx, self.vy, self.vth = 0.0, 0.0, 0.0
+        self.last_time = self.get_clock().now() # Initialize with ROS time for consistency
+        
+        self.buffer_distance = 0.1 # meters, adjust as needed
+        
+        self.last_time = self.get_clock().now()
+        
+         # --- Timer for regular odometry updates ---
+        self.timer_period = 0.02  # 50 Hz
+        self.create_timer(self.timer_period, self.update_odometry_timer_callback)
+        
+        self.trigger = False
+        self.last_linear = 0.0
+        self.last_angular = 0.0
+
+        
+    def joy_cb(self, msg: Joy):
+        if msg.buttons[0]:  # X (PS4)
+            if self.drive_mode != DRIVE_MODE.AUTO:
+                self.get_logger().info("Switching to AUTO mode")
+                self.drive_mode = DRIVE_MODE.AUTO
+                self.current_wp = 0
+                self.auto_mode = True
+                self.publish_twist(0.7, 0.0)
+
+        elif msg.buttons[1]:  # Circle (PS4)
+            if self.drive_mode != DRIVE_MODE.MANUAL:
+                self.get_logger().info("Switching to MANUAL mode")
+                self.drive_mode = DRIVE_MODE.MANUAL
+                self.auto_mode = False
+                self.publish_twist(0.0, 0.0)
+
+        # --- Deadman (R2/L2) ---
+        # R2 trigger (fully pressed ~ -1.0)
+        deadman_pressed = msg.axes[5] < - \
+            0.9 if len(msg.axes) > 5 else False
+
+        if not deadman_pressed:
+            if self.trigger:
+                self.publish_twist(0.0, 0.0)
+                self.get_logger().warn("Deadman released! Stopping.")
+            self.trigger = False
+            self.drive_mode = DRIVE_MODE.NONE
+            self.auto_mode = False
+            return
+
+        self.trigger = True
+
+        # --- Manual control ---
+        if self.drive_mode == DRIVE_MODE.MANUAL:
+            lin_input = msg.axes[1]  # Left stick vertical
+            ang_input = msg.axes[3]  # Right stick horizontal
+
+            # Cubic scaling for finer control
+            linear = -(lin_input ** 3) * 0.8
+            angular = -(ang_input ** 3) * 1.5
+
+            # Ramping
+            if abs(linear - self.last_linear) > 0.1:
+                linear = self.last_linear + \
+                    math.copysign(0.1, linear - self.last_linear)
+            if abs(angular - self.last_angular) > 0.15:
+                angular = self.last_angular + \
+                    math.copysign(0.15, angular - self.last_angular)
+
+            self.last_linear = linear
+            self.last_angular = angular
+
+            self.publish_twist(linear, angular)
+ 
+    def update_odometry_timer_callback(self):
+        """Calculates and publishes odometry, applying boundary checks."""
+        current_ros_time = self.get_clock().now()
+        dt = (current_ros_time - self.last_time).nanoseconds / 1e9
+
+        if dt <= 0.0001: # Avoid division by zero or large integration errors from tiny dt
+            return        
+
+        # --- Odometry Integration ---
+        # Calculate displacement based on current velocities and time step
+        delta_x = (self.vx * math.cos(self.th) - self.vy * math.sin(self.th)) * dt
+        delta_y = (self.vx * math.sin(self.th) + self.vy * math.cos(self.th)) * dt
+        delta_th = self.vth * dt
+
+        # Update pose
+        self.x += delta_x
+        self.y += delta_y
+        self.th += delta_th
+
+        # Normalize theta to keep it within -pi to pi range
+        self.th = math.atan2(math.sin(self.th), math.cos(self.th))
+
+        # --- Simple Boundary Enforcement (Clips X and Y) ---
+        # If the new position exceeds the boundary, cap it to the limit
+        # This will make the robot appear to stop at the boundary in its odometry.
+        turn_required = False
+        if self.x > self.map_max_x:
+            turn_required = True
+            self.x = self.map_max_x
+            self.get_logger().warn(f"Robot hit max X boundary ({self.map_max_x}). Clamping position.")
+        elif self.x < self.map_min_x:
+            turn_required = True
+            self.x = self.map_min_x
+            self.get_logger().warn(f"Robot hit min X boundary ({self.map_min_x}). Clamping position.")
+
+        if self.y > self.map_max_y:
+            turn_required = True
+            self.y = self.map_max_y
+            self.get_logger().warn(f"Robot hit max Y boundary ({self.map_max_y}). Clamping position.")
+        elif self.y < self.map_min_y:
+            turn_required = True
+            self.y = self.map_min_y
+            self.get_logger().warn(f"Robot hit min Y boundary ({self.map_min_y}). Clamping position.")
+            
+        with self.mutex:
+            if (self.is_turning):
+                return
+                
+            if (turn_required):
+                self.publish_twist(0.0, 0.0)
+
+                angle = 180#self.getRandomAngle()
+
+                self.turn_angle(angle)
+                # if (self.step_counter % 2 == 0):
+                #     self.turn_angle(-90.0)
+                # else:
+                #     self.turn_angle(90.0)
+                #self.step_counter += 1
+
+
+    
+    def lidar_cb(self, msg: LaserScan):
+        dist = []
+        angle = -30.0
+        
+        for angle in range(-30, 31):
+            #angle = angle + i
+            dist.append(self.getRangeAtDegree(msg, float(angle)))
+            
+        self.minRange, self.minAngle = self.getMinRange(dist)
+        if (self.minRange < self.getRandomRange()):
+            self.is_obstacle = True
+        else:
+            self.is_obstacle = False
+
+
+        with self.mutex:
+            if (self.is_turning):
+                return
+                
+            if (self.is_obstacle):
+                print('Obstacle Detected!')
+                self.publish_twist(0.0, 0.0)
+
+                angle = self.getRandomAngle()
+                if (self.minAngle < 0):
+                    angle = angle * -1.0
+
+                self.turn_angle(angle)
+                # if (self.step_counter % 2 == 0):
+                #     self.turn_angle(-90.0)
+                # else:
+                #     self.turn_angle(90.0)
+                #self.step_counter += 1
+
+    def getRandomRange(self):
+        range_list = [1.0, 1.1, 1.3, 1.4, 1.5, 1.6, 1.9, 2.1]
+        ret = random.choice(range_list)
+        #print('Random Range: ', ret)
+        return ret
+            
+    def getRandomAngle(self):
+        angle_list = [-90, -80, -70, -60, -90, -100, -120, -50, -40, -30]
+        ret = random.choice(angle_list)
+        #print('Random Angle: ', ret)
+        return ret
+        
+        
+    def getRangeAtDegree(self, scan: LaserScan, angle_degrees: float):
+        if (angle_degrees > 180.0):
+            angle_degrees -= 360.0
+        
+        angle_radians = angle_degrees * math.pi / 180.0
+        center_index = int(- scan.angle_min / scan.angle_increment)
+        index = center_index + int(angle_radians / scan.angle_increment)
+        
+        if (index >= 0 and index < len(scan.ranges)):
+            return scan.ranges[index]
+        return -1.0
+    
+    def getMinRange(self, angle_list: list):
+        min_range = math.inf
+        min_index = 0
+        
+        for i, range in enumerate(angle_list):
+            if (range < min_range and range > 0.1):
+                min_range = range
+                min_index = i
+        
+        angle = -30.0 + float(min_index)
+        return min_range, angle
+    
+    def timer_cb(self):
+        if self.angle_counter < 0:
+            return
+
+        if not self.auto_mode:
+            return 
+        
+        if self.angle_counter >= self.target_counter and not self.is_obstacle:
+            print('turning done')
+            self.angle_counter = -1
+            self.is_turning = False
+            self.publish_twist(0.7, 0.0)
+        
+        if (self.step_counter > 66):
+            print('step size is more than 35')
+            self.auto_mode = False
+            self.publish_twist(0.0, 0.0)
+            
+        self.angle_counter += 1
+        
+            
+    def turn_angle(self, angle):
+        angular_sp = 0.2
+        if angle < 0.0:
+            angular_sp = -0.2
+        else:
+            angular_sp = 0.2
+            
+        self.target_counter = int(abs(angle) / 10) * 100
+            
+        self.is_turning = True
+        
+        self.angle_counter = 0
+        
+        self.publish_twist(0.0, angular_sp)
+        
+    def publish_twist(self, lin: float, ang: float):
+        t = Twist()
+        t.linear.x = lin
+        t.angular.z = ang
+        self.vx = lin
+        self.vy = 0.0
+        self.vth = ang
+        self.cmd_pub.publish(t)
+    
+    
+    def heartbeat_cb(self):
+        hb = Int32(data=1 if self.trigger else 0)
+        self.heartbeat_pub.publish(hb)
+
+def main():
+    rclpy.init()
+    rclpy.spin(ControlNode())
+    rclpy.shutdown()
+
+
