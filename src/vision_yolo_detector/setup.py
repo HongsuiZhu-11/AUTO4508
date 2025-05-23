@@ -31,6 +31,7 @@ setup(
             'detect_node = vision_yolo_detector.yolo_center_detector:main',
             'digit_node = vision_yolo_detector.digit_detector_node:main',
             'camera_saver_node = vision_yolo_detector.camera_saver_node:main',
+            'unified_detector_node = vision_yolo_detector.unified_detector_node:main',
         ],
     }
 )
