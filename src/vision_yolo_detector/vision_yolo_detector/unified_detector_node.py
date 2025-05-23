@@ -25,7 +25,7 @@ class UnifiedDetector(Node):
 
         # Load YOLO models
         model_dir = pkg_resources.resource_filename('vision_yolo_detector', 'model')
-        self.model_digit = YOLO(os.path.join(model_dir, 'best.pt'))
+        self.model_digit = YOLO(os.path.join(model_dir, 'best_number.pt'))
         self.model_target = YOLO(os.path.join(model_dir, 'best_object.pt'))
 
         self.get_logger().info("✅ Unified YOLO detector initialized.")
