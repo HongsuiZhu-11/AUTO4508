@@ -33,13 +33,15 @@ class CameraViewer(Node):
         self.mode = 0  # Track whether live mode is active
         
         # Image Directory
-        self.image_dir = "/home/team10/center_detected_images"
-        if not os.path.exists(self.image_dir):
-            os.makedirs(self.image_dir)  # Create the directory if it doesn't exist
-            self.get_logger().info(f"Directory '{self.image_dir}' created.")
+        self.image_dirs = {
+            'Digits': '/home/team10/saved_images/digits',
+            'Objects': '/home/team10/saved_images/objects'
+        }
+        self.current_image_dir_name = 'Digits'
+        self.image_dir = self.image_dirs[self.current_image_dir_name]
+        self.image_files = []
+        self.image_index = 0
 
-        self.image_files = sorted([f for f in os.listdir(self.image_dir) if f.endswith((".jpg", ".png", ".jpeg"))])
-        self.image_index = 0  # Track which image is displayed
 
         self.build_base_ui()  # Build the base UI layout
         self.update_ui()  # Build the UI layout
@@ -152,7 +154,34 @@ class CameraViewer(Node):
         # Navigation buttons
         tk.Button(self.button_center_frame, text="← Prev", command=self.prev_image).grid(row=1, column=0, rowspan=2, columnspan=1, padx=5, sticky="ew")
         tk.Button(self.button_center_frame, text="Next →", command=self.next_image).grid(row=1, column=3, rowspan=2, columnspan=1,padx=5, sticky="ew")
+
+        dir_label = tk.Label(self.button_center_frame, text=f"Folder: {self.current_image_dir_name}", font=("Arial", 12))
+        dir_label.grid(row=2, column=0, columnspan=1, sticky="ew")
+
+        switch_button = tk.Button(self.button_center_frame, text="Switch Folder", command=self.switch_image_folder)
+        switch_button.grid(row=2, column=1, columnspan=2, sticky="ew")
+        self.load_image_files()
+        self.display_image()
     
+    def switch_image_folder(self):
+        names = list(self.image_dirs.keys())
+        current_idx = names.index(self.current_image_dir_name)
+        new_idx = (current_idx + 1) % len(names)
+        self.current_image_dir_name = names[new_idx]
+        self.image_dir = self.image_dirs[self.current_image_dir_name]
+        self.image_index = 0
+        self.load_image_files()
+        self.update_ui()  # Refresh UI
+
+    def load_image_files(self):
+        if os.path.exists(self.image_dir):
+            self.image_files = sorted(
+                f for f in os.listdir(self.image_dir)
+                if f.lower().endswith((".jpg", ".jpeg", ".png"))
+            )
+        else:
+            self.image_files = []
+
 
     def ui_lidar_mode(self):
         """ Update the UI to show the LiDAR viewer """
