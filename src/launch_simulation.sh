@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-colcon build --symlink-install --packages-select sim_aria_pkg control_pkg p3at_description
+colcon build --symlink-install --packages-select sim_aria_pkg control_package p3at_description
 
 source install/setup.bash
 

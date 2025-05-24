@@ -13,6 +13,7 @@ def generate_launch_description():
     # Paths
     pkg_share = get_package_share_directory("p3at_description")
     description_file = os.path.join(pkg_share, "urdf", "pioneer1.urdf")
+    # Ensure this points to your updated SDF
     world_file = os.path.join(pkg_share, "world", "empty.sdf")
 
     # Robot description via xacro
@@ -26,7 +27,7 @@ def generate_launch_description():
     )
     robot = ExecuteProcess(
         cmd=["ros2", "run", "ros_gz_sim", "create",
-             "-file", description_file, "-x", "10.0", "-y", "-10.0", "-z", "0.0"],
+             "-file", description_file, "-x", "-10", "-y", "-10", "-z", "0.0", "-Y", "0.0"],
         output="screen"
     )
 
@@ -68,7 +69,7 @@ def generate_launch_description():
     )
 
     control_node = Node(
-        package='control_pkg',
+        package='control_package',
         executable='control_node',
         name='control_node',
         output='screen',
@@ -86,13 +87,28 @@ def generate_launch_description():
         ],
     )
 
+    slam_toolbox_node = Node(
+        package='slam_toolbox',
+        executable='async_slam_toolbox_node',  # Or 'sync_slam_toolbox_node'
+        name='slam_toolbox',
+        output='screen',
+        parameters=[
+            # You'll need to create this config file
+            os.path.join(pkg_share, 'config', 'mapper_params_online.yaml')
+        ],
+        remappings=[
+            ('/scan', '/scan'),  # Remap if your lidar topic isn't /scan
+            ('/odom', '/odom'),  # Remap if your odometry topic isn't /odom
+        ],
+    )
+
     # 7) Bridge ROS2 ↔ Gazebo topics
     ros_gz_bridge = ExecuteProcess(
         cmd=[
             'ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
             '/cmd_vel_team10@geometry_msgs/msg/Twist@gz.msgs.Twist',
             '/scan@sensor_msgs/msg/LaserScan@gz.msgs.LaserScan',
-            '/imu@sensor_msgs/msg/Imu@gz.msgs.IMU',
+            '/imu@sensor_msgs/msg/Imu@gz.msgs.Imu',  # Corrected Imu
             '/camera@sensor_msgs/msg/Image@gz.msgs.Image',
             '/cmd_vel_team10@geometry_msgs/msg/Twist@gz.msgs.Twist',
             '/heartbeat_team10@std_msgs/msg/Int32@gz.msgs.Int32',
@@ -116,4 +132,5 @@ def generate_launch_description():
         control_node,
         teleop_node,
         ros_gz_bridge,
+        slam_toolbox_node,
     ])
